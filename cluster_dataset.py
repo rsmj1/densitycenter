@@ -7,14 +7,15 @@ from DBSCAN import DBSCAN
 from sklearn.metrics import normalized_mutual_info_score as nmi
 from sklearn.decomposition import PCA
 import networkx as nx
-import hdbscan
+#import hdbscan
 
 from experiment_utils.get_data import get_dataset, make_circles
 from distance_metric import get_dc_dist_matrix
 from density_tree import make_tree
 from tree_plotting import plot_embedding
+from tree_plotting import plot_tree
 from cluster_tree import dc_clustering
-from GDR import GradientDR
+#from GDR import GradientDR
 from SpectralClustering import get_lambdas, get_sim_mx, run_spectral_clustering
 
 if __name__ == '__main__':
@@ -55,7 +56,8 @@ if __name__ == '__main__':
     # )
     # points, labels = get_dataset('mnist', num_classes=10, points_per_class=50)
     points, labels = make_moons(n_samples=400, noise=0.1)
-
+    print("points type:", type(points))
+    print("labels:", labels)
     root, dc_dists = make_tree(
         points,
         labels,
