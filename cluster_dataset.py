@@ -56,7 +56,7 @@ if __name__ == '__main__':
     # )
     # points, labels = get_dataset('mnist', num_classes=10, points_per_class=50)
     points, labels = make_moons(n_samples=400, noise=0.1)
-    print("points type:", type(points))
+    print("points type:", points.shape[0])
     print("labells:", labels)
     root, dc_dists = make_tree(
         points,
