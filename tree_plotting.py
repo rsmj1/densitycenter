@@ -33,7 +33,7 @@ def find_node_positions(root, width=1, vert_gap=0.2, vert_loc=0, xcenter=0.5, po
 def make_node_lists(root, point_labels, parent_count, dist_list, edge_list, color_list, alpha_list):
     count = parent_count
     dist_list.append(root.dist)
-    if root.is_leaf():
+    if root.is_leaf:
         color_list.append(point_labels[root.point_id])
         alpha_list.append(1)
     else:
