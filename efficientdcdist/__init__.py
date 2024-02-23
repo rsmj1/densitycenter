@@ -9,15 +9,6 @@ from .dctree import (
     load as load_DCTree,
 )
 
-from .sample_dctree import (
-    SampleDCTree,
-    serialize as serialize_SampleDCTree,
-    serialize_compressed as serialize_SampleDCTree_compressed,
-    save as save_SampleDCTree,
-    deserialize as deserialize_SampleDCTree,
-    deserialize_compressed as deserialize_SampleDCTree_compressed,
-    load as load_SampleDCTree,
-)
 
 __all__ = [
     ###  DCTree  ###
@@ -29,12 +20,5 @@ __all__ = [
     "deserialize_DCTree",
     "deserialize_DCTree_compressed",
     "load_DCTree",
-    ###  SampleDCTree  ###
-    "SampleDCTree",
-    "serialize_SampleDCTree",
-    "serialize_SampleDCTree_compressed",
-    "save_SampleDCTree",
-    "deserialize_SampleDCTree",
-    "deserialize_SampleDCTree_compressed",
-    "load_SampleDCTree",
+
 ]

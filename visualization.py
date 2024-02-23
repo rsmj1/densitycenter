@@ -131,11 +131,11 @@ def create_edges(distance_matrix, num_neighbors = None):
   return edges, edge_labels
 
 def main():
-    samples = 10
+    samples = 6
     minPts = 3
     #Choose point distribution
-    #points, labels = make_moons(n_samples=samples, noise=0.1)
-    points, labels = make_blobs(n_samples=samples, centers=2)
+    points, labels = make_moons(n_samples=samples, noise=0.1)
+    #points, labels = make_blobs(n_samples=samples, centers=2)
 
 
     root, dc_dists = make_tree(
@@ -150,9 +150,9 @@ def main():
 
 
     #Choose distance function
-    #dist = "mut_reach"
+    dist = "mut_reach"
     #dist = "euclidean"
-    dist = "dc_dist"
+    #dist = "dc_dist"
 
 
     print("points: \n", points)
