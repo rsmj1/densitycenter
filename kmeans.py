@@ -46,8 +46,44 @@ class KMEANS(object):
     n = points.shape[0]
     dc_tree = dcdist.DCTree(points, min_points=minPts)
 
+    '''
+    Choose one center uniformly at random among the data points.
+    For each data point x not chosen yet, compute D(x), the distance between x and the nearest center that has already been chosen.
+    Choose one new data point at random as a new center, using a weighted probability distribution where a point x is chosen with probability proportional to D(x)2.
+    Repeat Steps 2 and 3 until k centers have been chosen.
+    Now that the initial centers have been chosen, proceed using standard k-means clustering.
+    '''
+    #Keep set of points that might be chosen as new centers
+    #I use a numpy array rather than a set since choosing a random element from a set is inefficient and furthermore does not allow me to use the dc_tree.distances() function
+    if self.k >= n:
+       raise AssertionError("k should be smaller than the number of points...")
+    
+    point_indexes = np.arange(n)
+    cluster_center_indexes = np.zeros(self.k, dtype=np.int64)
+    #Choose first center uniformly at random
+    first_choice = np.random.choice(n, 1)
+    cluster_center_indexes[0] = first_choice
 
-    cluster_center_indexes = None
+    #Remove first center from pool of possible points to choose. If not, cycles of chosen points might occur. 
+    point_indexes = point_indexes[point_indexes!= first_choice]
+
+    #print("Distance 0, choice", dc_tree.dc_dist(0,cluster_center_indexes[0]), "Distance n, choice", dc_tree.dc_dist(n-1, cluster_center_indexes[0]))
+    for i in range(1, self.k):
+       #Compute the distance between previous cluster and all points that can be a new cluster center
+       dists_to_cluster = dc_tree.dc_distances(np.array([cluster_center_indexes[i-1]]), point_indexes)
+       
+       #Choose next point according to pdf based on D(x')^2/sum_x\inX(D(x)^2). Squeeze ensures proper shape of array, from (1,n) to (n,)
+       squared_dists = dists_to_cluster ** 2
+       pdf = np.squeeze(squared_dists / squared_dists.sum())
+       choice = np.random.choice(point_indexes, 1, p=pdf)
+
+       #Remove next chosen point from pool of possible points to choose. If not, cycles of chosen points might occur. 
+       point_indexes = point_indexes[point_indexes!= choice]
+
+       cluster_center_indexes[i] = choice
+
+       
+    print("final indexes:", cluster_center_indexes)
     self.basic_dc_lloyds(points, dc_tree, cluster_center_indexes, minPts, max_iters)
   
   def naive_dc_kmeans(self, points, minPts, max_iters=100):
@@ -64,7 +100,8 @@ points = np.array([[1,1],[2,2], [3,3], [3,2], [1,2],
                    [15,15],[16,16], [17,17], [17,15], [17,16]])
 
 kmeans = KMEANS(k=2)
-kmeans.naive_dc_kmeans(points=points, minPts=2, max_iters=5)
+kmeans.plusplus_dc_kmeans(points=points, minPts=2, max_iters=5)
+#kmeans.naive_dc_kmeans(points=points, minPts=2, max_iters=5)
 '''
  Examples
     --------
