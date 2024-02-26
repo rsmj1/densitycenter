@@ -8,36 +8,53 @@ class KMEANS(object):
         self.k = k # The number of clusters that the given kmeans algorithm chosen will use
         self.labels = None #the kmeans applied will put the cluster labels here
 
-  def naive_dc_kmeans(self, points, minPts, max_iters=100):
+  def basic_dc_lloyds(self, points, dc_tree, cluster_center_indexes, minPts, max_iters=100):
     '''
       Naive dc Kmeans uses LLoyd's algorithm, in each iteration using the point closest to all others as its "mean" rather than computing the mean explicitly
       By default only takes as input a dc_dist tree, and is not intended to work with other distance functions. 
     '''
-    dc_tree = dcdist.DCTree(points, min_points=minPts)
     n = points.shape[0]
-    cluster_center_indexes = np.random.choice(n, self.k, False)
     cluster_assignments = None
 
     for i in range(max_iters):
+      old_center_indexes = cluster_center_indexes.copy() #Save the old indexes for termination criteria
       #Assign points to closest cluster
       dists = np.array([[dc_tree.dc_dist(c,p_index) for c in cluster_center_indexes] for p_index in range(n)])
       cluster_assignments = np.argmin(dists, axis=1)
 
       #No need to create new clusters for last iteration
       if i == max_iters -1:
+         print("Max iters reached")
          continue
+      
       #Create new clusters by finding point with smallest distance to all other points within cluster
       #This is currently an n^2 operation...
       for c in range(self.k):
          cluster_indexes = np.nonzero(cluster_assignments == c)[0]
          mean_dists = [np.mean([dc_tree.dc_dist(point, other) for other in cluster_indexes]) for point in cluster_indexes]
          cluster_center_indexes[c] = cluster_indexes[np.argmin(mean_dists)]
-        
+
+      if np.array_equal(cluster_center_indexes, old_center_indexes):
+        print("Stable point reached, stopping at iteration", i)
+        break
+  
     self.labels = cluster_assignments
     print("Final assignments:", self.labels)
 
 
+  def plusplus_dc_kmeans(self, points, minPts, max_iters=100):
+    n = points.shape[0]
+    dc_tree = dcdist.DCTree(points, min_points=minPts)
 
+
+    cluster_center_indexes = None
+    self.basic_dc_lloyds(points, dc_tree, cluster_center_indexes, minPts, max_iters)
+  
+  def naive_dc_kmeans(self, points, minPts, max_iters=100):
+    n = points.shape[0]
+    dc_tree = dcdist.DCTree(points, min_points=minPts)
+    cluster_center_indexes = np.random.choice(n, self.k, False)
+    self.basic_dc_lloyds(points, dc_tree, cluster_center_indexes, minPts, max_iters)
 
 
 
