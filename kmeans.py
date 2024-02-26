@@ -8,7 +8,7 @@ class KMEANS(object):
         self.k = k # The number of clusters that the given kmeans algorithm chosen will use
         self.labels = None #the kmeans applied will put the cluster labels here
 
-  def basic_dc_lloyds(self, points, dc_tree, cluster_center_indexes, minPts, max_iters=100):
+  def basic_dc_lloyds(self, points, dc_tree, cluster_center_indexes, max_iters=100):
     '''
       Naive dc Kmeans uses LLoyd's algorithm, in each iteration using the point closest to all others as its "mean" rather than computing the mean explicitly
       By default only takes as input a dc_dist tree, and is not intended to work with other distance functions. 
@@ -29,6 +29,8 @@ class KMEANS(object):
       
       #Create new clusters by finding point with smallest distance to all other points within cluster
       #This is currently an n^2 operation...
+      #TODO: This can be improved by using the distances method which will make the matrix very efficiently. From there, we just take the mean in each row.
+      #However, still n^2 to take the mean in each row
       for c in range(self.k):
          cluster_indexes = np.nonzero(cluster_assignments == c)[0]
          mean_dists = [np.mean([dc_tree.dc_dist(point, other) for other in cluster_indexes]) for point in cluster_indexes]
@@ -69,9 +71,9 @@ class KMEANS(object):
 
     #print("Distance 0, choice", dc_tree.dc_dist(0,cluster_center_indexes[0]), "Distance n, choice", dc_tree.dc_dist(n-1, cluster_center_indexes[0]))
     for i in range(1, self.k):
-       #Compute the distance between previous cluster and all points that can be a new cluster center
-       dists_to_cluster = dc_tree.dc_distances(np.array([cluster_center_indexes[i-1]]), point_indexes)
-       
+       #Compute the minimal distance for each point that has yet to be chosen between it and all previously chosen centers
+       #dists_to_cluster = dc_tree.dc_distances(np.array([cluster_center_indexes[i-1]]), point_indexes)
+       dists_to_cluster = np.array([np.min([dc_tree.dc_dist(c,p) for c in cluster_center_indexes[:i]]) for p in point_indexes])
        #Choose next point according to pdf based on D(x')^2/sum_x\inX(D(x)^2). Squeeze ensures proper shape of array, from (1,n) to (n,)
        squared_dists = dists_to_cluster ** 2
        pdf = np.squeeze(squared_dists / squared_dists.sum())
@@ -84,13 +86,13 @@ class KMEANS(object):
 
        
     print("final indexes:", cluster_center_indexes)
-    self.basic_dc_lloyds(points, dc_tree, cluster_center_indexes, minPts, max_iters)
+    self.basic_dc_lloyds(points, dc_tree, cluster_center_indexes, max_iters)
   
   def naive_dc_kmeans(self, points, minPts, max_iters=100):
     n = points.shape[0]
     dc_tree = dcdist.DCTree(points, min_points=minPts)
     cluster_center_indexes = np.random.choice(n, self.k, False)
-    self.basic_dc_lloyds(points, dc_tree, cluster_center_indexes, minPts, max_iters)
+    self.basic_dc_lloyds(points, dc_tree, cluster_center_indexes, max_iters)
 
 
 
