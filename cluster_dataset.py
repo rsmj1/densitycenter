@@ -18,13 +18,17 @@ from cluster_tree import dc_clustering
 #from GDR import GradientDR
 from SpectralClustering import get_lambdas, get_sim_mx, run_spectral_clustering
 
+#My addons
+from kmeans import KMEANS
+from sklearn.cluster import HDBSCAN
+
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
     parser.add_argument(
         '--min-pts',
         type=int,
-        default=1,
+        default=3,
         help='Min points parameter to use for density-connectedness'
     )
     parser.add_argument(
@@ -56,8 +60,8 @@ if __name__ == '__main__':
     # )
     # points, labels = get_dataset('mnist', num_classes=10, points_per_class=50)
     points, labels = make_moons(n_samples=400, noise=0.1)
-    print("points type:", points.shape[0])
-    print("labells:", labels)
+    #print("points type:", points.shape[0])
+    #print("labells:", labels)
     root, dc_dists = make_tree(
         points,
         labels,
@@ -98,15 +102,54 @@ if __name__ == '__main__':
         type_="it"
     )
 
-    print('Epsilon values per clusters', epsilons)
-    print('NMI spectral vs. k-center:', nmi(sc_labels, pred_labels))
-    print('NMI spectral vs. DBSCAN*:', nmi(sc_labels, dbscan_orig.labels_))
-    print('NMI DBSCAN* vs. k-center:', nmi(dbscan_orig.labels_, pred_labels))
+    ################################ MY CODE ####################################
+    #Default k-value is 4
+    #Change it by calling this python script with command-line argument ".....py --k valueOfK"
+
+    #Default min_pts value is 3 
+    #K-means clustering
+    kmeans = KMEANS(k=args.k)
+    kmeans.plusplus_dc_kmeans(points=points, minPts=args.min_pts, max_iters=100)
+    kmeans_labels = kmeans.labels
+    #HDBSCAN clustering
+    '''
+    https://scikit-learn.org/stable/modules/generated/sklearn.cluster.HDBSCAN.html
+    Has following relevant arguments: 
+    - min_cluster_size:
+    - min_samples: defaults to min_cluster_size. This functions as minPts.  
+    - metric: default = 'euclidean'
+
+    '''
+    hdbscan = HDBSCAN(min_samples = args.min_pts)
+    hdbscan.fit(points)
+    hdb_labels = hdbscan.labels_
+
+
 
     plot_points = points
     plot_embedding(
         plot_points,
-        [labels, pred_labels, dbscan_orig.labels_, sc_labels],
-        ['truth', 'k-Center on DC-dists', 'DBSCAN*', 'Ultrametric Spectral Clustering'],
+        [labels, pred_labels, hdb_labels, kmeans_labels],
+        ['truth', 'k-Center on DC-dists', 'HDBSCAN', 'K-means'],
         centers=centers
     )
+
+
+
+    ################################ MY CODE ####################################
+
+
+
+
+    # print('Epsilon values per clusters', epsilons)
+    # print('NMI spectral vs. k-center:', nmi(sc_labels, pred_labels))
+    # print('NMI spectral vs. DBSCAN*:', nmi(sc_labels, dbscan_orig.labels_))
+    # print('NMI DBSCAN* vs. k-center:', nmi(dbscan_orig.labels_, pred_labels))
+
+    # plot_points = points
+    # plot_embedding(
+    #     plot_points,
+    #     [labels, pred_labels, dbscan_orig.labels_, sc_labels],
+    #     ['truth', 'k-Center on DC-dists', 'DBSCAN*', 'Ultrametric Spectral Clustering'],
+    #     centers=centers
+    # )

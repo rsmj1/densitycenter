@@ -41,7 +41,7 @@ class KMEANS(object):
         break
   
     self.labels = cluster_assignments
-    print("Final assignments:", self.labels)
+    #print("Final assignments:", self.labels)
 
 
   def plusplus_dc_kmeans(self, points, minPts, max_iters=100):
@@ -85,7 +85,7 @@ class KMEANS(object):
        cluster_center_indexes[i] = choice
 
        
-    print("final indexes:", cluster_center_indexes)
+    #print("final indexes:", cluster_center_indexes)
     self.basic_dc_lloyds(points, dc_tree, cluster_center_indexes, max_iters)
   
   def naive_dc_kmeans(self, points, minPts, max_iters=100):
@@ -104,6 +104,11 @@ points = np.array([[1,1],[2,2], [3,3], [3,2], [1,2],
 kmeans = KMEANS(k=2)
 kmeans.plusplus_dc_kmeans(points=points, minPts=2, max_iters=5)
 #kmeans.naive_dc_kmeans(points=points, minPts=2, max_iters=5)
+
+
+
+
+
 '''
  Examples
     --------
