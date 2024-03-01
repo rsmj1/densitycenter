@@ -59,7 +59,7 @@ if __name__ == '__main__':
     #     thicknesses=[0.1, 0.1]
     # )
     # points, labels = get_dataset('mnist', num_classes=10, points_per_class=50)
-    points, labels = make_moons(n_samples=400, noise=0.1)
+    points, labels = make_moons(n_samples=200, noise=0.1)
     #print("points type:", points.shape[0])
     #print("labells:", labels)
     root, dc_dists = make_tree(
@@ -70,7 +70,7 @@ if __name__ == '__main__':
         n_neighbors=args.n_neighbors
     )
 
-    pred_labels, centers, epsilons = dc_clustering(
+    pred_labels, centerss, epsilons = dc_clustering(
         root,
         num_points=len(labels),
         k=args.k,
@@ -88,19 +88,19 @@ if __name__ == '__main__':
     dc_core_pt_inds = np.where(np.logical_and(pred_labels > -1, dbscan_orig.labels_ > -1))
 
     # Ultrametric Spectral Clustering
-    no_lambdas = get_lambdas(root, eps)
-    dsnenns = get_dc_dist_matrix(points, args.n_neighbors, min_points=args.min_pts)
-    sim = get_sim_mx(dsnenns)
-    sc_, sc_labels = run_spectral_clustering(
-        root,
-        sim,
-        dc_dists,
-        eps=eps,
-        it=no_lambdas,
-        min_pts=args.min_pts,
-        n_clusters=args.k,
-        type_="it"
-    )
+    # no_lambdas = get_lambdas(root, eps)
+    # dsnenns = get_dc_dist_matrix(points, args.n_neighbors, min_points=args.min_pts)
+    # sim = get_sim_mx(dsnenns)
+    # sc_, sc_labels = run_spectral_clustering(
+    #     root,
+    #     sim,
+    #     dc_dists,
+    #     eps=eps,
+    #     it=no_lambdas,
+    #     min_pts=args.min_pts,
+    #     n_clusters=args.k,
+    #     type_="it"
+    # )
 
     ################################ MY CODE ####################################
     #Default k-value is 4
@@ -109,8 +109,9 @@ if __name__ == '__main__':
     #Default min_pts value is 3 
     #K-means clustering
     kmeans = KMEANS(k=args.k)
-    kmeans.plusplus_dc_kmeans(points=points, minPts=args.min_pts, max_iters=100)
+    kmeans.naive_dc_kmeans(points=points, minPts=args.min_pts, max_iters=100)
     kmeans_labels = kmeans.labels
+    centers = kmeans.centers
     #HDBSCAN clustering
     '''
     https://scikit-learn.org/stable/modules/generated/sklearn.cluster.HDBSCAN.html

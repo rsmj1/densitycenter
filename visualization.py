@@ -111,7 +111,28 @@ def get_dists(dist_type, points, minPts=3):
 
   return dists
   
+def print_numpy_code(array, newline=True):
+   if not newline:
+    print("np.array([", end="")
+   else:
+    print("np.array([")
+   for j, row in enumerate(array):
+      print("[", end="")
+      for i, elem in enumerate(row):
+         if i == row.shape[0]-1:
+            print(elem, end="")
+         else:
+            print(str(elem) + ",", end="")
+      if j == array.shape[0]-1:
+        print("]", end="")
+      else:
+        if not newline:
+          print("],", end="")
+        else:
+          print("],")
+   print("])")
 
+#points = np.array([[1,6],[2,6],[6,2],[14,17],[123,3246],[52,8323],[265,73]])
 
 
 #TODO: Add so that I can see Euclidean, Mut Reach, DC and embedding at once
@@ -138,13 +159,13 @@ def main():
     #points, labels = make_blobs(n_samples=samples, centers=2)
 
 
-    root, dc_dists = make_tree(
-        points,
-        labels,
-        min_points=minPts,
-        make_image=True,
-        n_neighbors=minPts
-    )
+    # root, dc_dists = make_tree(
+    #     points,
+    #     labels,
+    #     min_points=minPts,
+    #     make_image=True,
+    #     n_neighbors=minPts
+    # )
 
 
 
@@ -158,6 +179,7 @@ def main():
     print("points: \n", points)
 
 
-    visualize(points=points, cluster_labels=labels, embed=True, distance=dist, minPts=minPts)
+    #visualize(points=points, cluster_labels=labels, embed=True, distance=dist, minPts=minPts)
+    #print_numpy_code(points)
 
 main()

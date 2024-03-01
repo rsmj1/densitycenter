@@ -118,7 +118,7 @@ def make_tree(points, labels, min_points=1, n_neighbors=15, make_image=False, po
         point_ids = np.arange(int(dc_dists.shape[0]))
 
     root = _make_tree(dc_dists, labels, point_ids)
-    print("root:", root)
+    #print("root:", root)
     if make_image:
         plot_tree(root, labels)
 

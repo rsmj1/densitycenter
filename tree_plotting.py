@@ -80,7 +80,7 @@ def plot_tree(root, labels):
     plt.show()
 
 
-def plot_embedding(embed_points, embed_labels, titles, centers):
+def plot_embedding(embed_points, embed_labels, titles, centers = None):
     if len(embed_points.shape) == 1:
         embed_points = np.stack((embed_points, np.zeros_like(embed_points)), -1)
     if not isinstance(embed_labels, list):
@@ -93,5 +93,7 @@ def plot_embedding(embed_points, embed_labels, titles, centers):
     for i, labels in enumerate(embed_labels):
         axes[i].scatter(embed_points[:, 0], embed_points[:, 1], c=labels)
         axes[i].set_title(titles[i])
+        if titles[i] == "K-means" and centers is not None:
+            axes[i].scatter(centers[:, 0], centers[:,1], c="r")
     plt.show()
 

@@ -7,6 +7,7 @@ class KMEANS(object):
   def __init__(self, *, k):
         self.k = k # The number of clusters that the given kmeans algorithm chosen will use
         self.labels = None #the kmeans applied will put the cluster labels here
+        self.centers = None
 
   def basic_dc_lloyds(self, points, dc_tree, cluster_center_indexes, max_iters=100):
     '''
@@ -18,10 +19,12 @@ class KMEANS(object):
 
     for i in range(max_iters):
       old_center_indexes = cluster_center_indexes.copy() #Save the old indexes for termination criteria
+      #print("Start of iteration cluster indexes:", old_center_indexes)
       #Assign points to closest cluster
       dists = np.array([[dc_tree.dc_dist(c,p_index) for c in cluster_center_indexes] for p_index in range(n)])
+      #print("Distances to these clusters:", dists)
       cluster_assignments = np.argmin(dists, axis=1)
-
+      #print("Yielding the following cluster assignments:", cluster_assignments)
       #No need to create new clusters for last iteration
       if i == max_iters -1:
          print("Max iters reached")
@@ -32,21 +35,26 @@ class KMEANS(object):
       #TODO: This can be improved by using the distances method which will make the matrix very efficiently. From there, we just take the mean in each row.
       #However, still n^2 to take the mean in each row
       for c in range(self.k):
+         #Find indexes of points part of cluster c
          cluster_indexes = np.nonzero(cluster_assignments == c)[0]
+         #print("Indexes of cluster" + str(c)+" are:", cluster_indexes)
          mean_dists = [np.mean([dc_tree.dc_dist(point, other) for other in cluster_indexes]) for point in cluster_indexes]
+         #print("mean_dists:", mean_dists)
          cluster_center_indexes[c] = cluster_indexes[np.argmin(mean_dists)]
+         #print("chose index:", cluster_center_indexes[c])
 
       if np.array_equal(cluster_center_indexes, old_center_indexes):
         print("Stable point reached, stopping at iteration", i)
         break
   
+    self.centers = points[cluster_center_indexes]
     self.labels = cluster_assignments
     #print("Final assignments:", self.labels)
 
 
   def plusplus_dc_kmeans(self, points, minPts, max_iters=100):
     n = points.shape[0]
-    dc_tree = dcdist.DCTree(points, min_points=minPts)
+    dc_tree = dcdist.DCTree(points, min_points=minPts, n_jobs=1)
 
     '''
     Choose one center uniformly at random among the data points.
@@ -90,7 +98,7 @@ class KMEANS(object):
   
   def naive_dc_kmeans(self, points, minPts, max_iters=100):
     n = points.shape[0]
-    dc_tree = dcdist.DCTree(points, min_points=minPts)
+    dc_tree = dcdist.DCTree(points, min_points=minPts, n_jobs=1)
     cluster_center_indexes = np.random.choice(n, self.k, False)
     self.basic_dc_lloyds(points, dc_tree, cluster_center_indexes, max_iters)
 
@@ -98,11 +106,11 @@ class KMEANS(object):
 
 #Basic testing:
 #points = np.array([[1,6],[2,6],[6,2],[14,17],[123,3246],[52,8323],[265,73]])
-points = np.array([[1,1],[2,2], [3,3], [3,2], [1,2], 
-                   [15,15],[16,16], [17,17], [17,15], [17,16]])
+#points = np.array([[1,1],[2,2], [3,3], [3,2], [1,2], 
+#                   [15,15],[16,16], [17,17], [17,15], [17,16]])
 
-kmeans = KMEANS(k=2)
-kmeans.plusplus_dc_kmeans(points=points, minPts=2, max_iters=5)
+#kmeans = KMEANS(k=2)
+#kmeans.plusplus_dc_kmeans(points=points, minPts=2, max_iters=5)
 #kmeans.naive_dc_kmeans(points=points, minPts=2, max_iters=5)
 
 
