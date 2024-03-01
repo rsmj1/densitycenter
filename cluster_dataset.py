@@ -21,6 +21,8 @@ from SpectralClustering import get_lambdas, get_sim_mx, run_spectral_clustering
 #My addons
 from kmeans import KMEANS
 from sklearn.cluster import HDBSCAN
+from sklearn.cluster import KMeans
+from point_gen import create_hierarchical_clusters
 
 if __name__ == '__main__':
     import argparse
@@ -50,6 +52,9 @@ if __name__ == '__main__':
     )
     args = parser.parse_args()
 
+    #CHANGE NUMBER OF SAMPLES HERE
+    samples = 200
+
     # points, labels = get_dataset('synth', num_classes=6, points_per_class=72)
     # points, labels = get_dataset('coil', class_list=np.arange(1, 20), points_per_class=36)
     # points, labels = make_circles(
@@ -59,9 +64,16 @@ if __name__ == '__main__':
     #     thicknesses=[0.1, 0.1]
     # )
     # points, labels = get_dataset('mnist', num_classes=10, points_per_class=50)
-    points, labels = make_moons(n_samples=200, noise=0.1)
-    #print("points type:", points.shape[0])
-    #print("labells:", labels)
+    points, labels = make_moons(n_samples=samples, noise=0.1)
+    
+    #Point generation with hierarchical clusters, comment in or out these four lines
+    #This does not have ground truth labels, so just use sklearn kmeans over euclidean distance as "ground truth"
+    # points = create_hierarchical_clusters(n=samples, unique_vals=True)
+    # euclid_kmeans = KMeans(n_clusters=args.k)
+    # euclid_kmeans.fit(points)
+    # labels = euclid_kmeans.labels_
+    #End of point generation with hierarchical clusters
+    
     root, dc_dists = make_tree(
         points,
         labels,
@@ -70,7 +82,9 @@ if __name__ == '__main__':
         n_neighbors=args.n_neighbors
     )
 
-    pred_labels, centerss, epsilons = dc_clustering(
+
+    #K-center
+    pred_labels, kcenter_centers, epsilons = dc_clustering(
         root,
         num_points=len(labels),
         k=args.k,
@@ -78,14 +92,14 @@ if __name__ == '__main__':
     )
 
     # Change the eps by a tiny amount so that that distance is included in the DBSCAN cuts
-    eps = np.max(epsilons[np.where(epsilons > 0)]) + 1e-8
+    #eps = np.max(epsilons[np.where(epsilons > 0)]) + 1e-8
 
     # DBSCAN*
-    dbscan_orig = DBSCAN(eps=eps, min_pts=args.min_pts, cluster_type='corepoints')
-    dbscan_orig.fit(points)
+    # dbscan_orig = DBSCAN(eps=eps, min_pts=args.min_pts, cluster_type='corepoints')
+    # dbscan_orig.fit(points)
 
-    dbscan_core_pt_inds = np.where(dbscan_orig.labels_ > -1)
-    dc_core_pt_inds = np.where(np.logical_and(pred_labels > -1, dbscan_orig.labels_ > -1))
+    # dbscan_core_pt_inds = np.where(dbscan_orig.labels_ > -1)
+    # dc_core_pt_inds = np.where(np.logical_and(pred_labels > -1, dbscan_orig.labels_ > -1))
 
     # Ultrametric Spectral Clustering
     # no_lambdas = get_lambdas(root, eps)
@@ -105,11 +119,16 @@ if __name__ == '__main__':
     ################################ MY CODE ####################################
     #Default k-value is 4
     #Change it by calling this python script with command-line argument ".....py --k valueOfK"
+    #Or just by changing the default value above...
 
     #Default min_pts value is 3 
+    #Again, change in command-line or changing default value above.
+
     #K-means clustering
     kmeans = KMEANS(k=args.k)
     kmeans.naive_dc_kmeans(points=points, minPts=args.min_pts, max_iters=100)
+    #kmeans.plusplus_dc_kmeans(points=points, minPts=args.min_pts, max_iters=100)
+
     kmeans_labels = kmeans.labels
     centers = kmeans.centers
     #HDBSCAN clustering
@@ -137,7 +156,7 @@ if __name__ == '__main__':
 
 
 
-    ################################ MY CODE ####################################
+    ################################ MY CODE END ####################################
 
 
 
