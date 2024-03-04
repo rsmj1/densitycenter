@@ -1,6 +1,7 @@
 import networkx as nx
 import matplotlib.pyplot as plt
 import numpy as np
+from datetime import datetime
 
 def find_node_positions(root, width=1, vert_gap=0.2, vert_loc=0, xcenter=0.5, pos=None):
     if pos is None:
@@ -30,9 +31,12 @@ def find_node_positions(root, width=1, vert_gap=0.2, vert_loc=0, xcenter=0.5, po
 
     return pos
 
-def make_node_lists(root, point_labels, parent_count, dist_list, edge_list, color_list, alpha_list, edgecolor_list, centers=None):
+def make_node_lists(root, point_labels, parent_count, dist_list, edge_list, color_list, alpha_list, edgecolor_list, dist_dict, centers=None):
     count = parent_count
-    dist_list.append(root.dist)
+    if root.dist > 0:
+        dist_list.append(root.dist)
+    else: 
+        dist_list.append(root.point_id)
     if root.is_leaf:
         color_list.append(point_labels[root.point_id])
         alpha_list.append(1)
@@ -60,41 +64,48 @@ def make_node_lists(root, point_labels, parent_count, dist_list, edge_list, colo
                 color_list,
                 alpha_list,
                 edgecolor_list,
+                dist_dict,
                 centers
             )
 
     return count
 
-def plot_tree(root, labels, centers=None):
+def plot_tree(root, labels, centers=None, save=False, save_name=None):
+    dist_dict = {}
+
     edge_list = []
     dist_list = []
     color_list = []
     alpha_list = []
     edgecolor_list = []
-    make_node_lists(root, labels, 1, dist_list, edge_list, color_list, alpha_list, edgecolor_list, centers)
+    make_node_lists(root, labels, 1, dist_list, edge_list, color_list, alpha_list, edgecolor_list, dist_dict, centers)
     G = nx.Graph()
     G.add_edges_from(edge_list)
     pos_list = find_node_positions(root, 10)
 
-
     pos_dict = {}
-    dist_dict = {}
     for i, node in enumerate(G.nodes):
         pos_dict[node] = pos_list[i]
-        if dist_list[i] > 0:
-            dist_dict[node] = '{:.1f}'.format(dist_list[i])
 
+        dist_dict[node] = '{:.1f}'.format(dist_list[i]) if dist_list[i] % 1 != 0 else '{:.0f}'.format(dist_list[i])
 
     
-    print("color_list:", color_list)
+    plt.title("dc-distance tree with n=" + str(len(labels)))
+    
     nx.draw_networkx_nodes(G, pos=pos_dict, node_color=color_list, alpha=alpha_list, edgecolors=edgecolor_list)
     nx.draw_networkx_edges(G, pos=pos_dict)
     nx.draw_networkx_labels(G, pos=pos_dict, labels=dist_dict)
-    plt.savefig("tree.png")
+
+
+    if save:
+        if save_name is None:
+            save_name = str(datetime.now())
+        plt.savefig("savefiles/images/"+save_name+"_tree.png")
+
     plt.show()
 
 
-def plot_embedding(embed_points, embed_labels, titles, centers = None, dot_scale = 1):
+def plot_embedding(embed_points, embed_labels, titles, centers = None, dot_scale = 1, save=False, save_name=None):
     dot_size = (plt.rcParams['lines.markersize'] ** 2) * dot_scale
 
     if len(embed_points.shape) == 1:
@@ -111,5 +122,11 @@ def plot_embedding(embed_points, embed_labels, titles, centers = None, dot_scale
         axes[i].set_title(titles[i])
         if titles[i] == "K-means" and centers is not None:
             axes[i].scatter(centers[:, 0], centers[:,1], c="r", s=dot_size)
+    
+    if save:
+        if save_name is None:
+            save_name = str(datetime.now())
+        plt.savefig("savefiles/images/"+save_name+"_embeddings.png")
+    
     plt.show()
 

@@ -24,6 +24,8 @@ from kmeans import KMEANS
 from sklearn.cluster import HDBSCAN
 from sklearn.cluster import KMeans
 from point_gen import create_hierarchical_clusters
+from visualization import visualize
+
 
 if __name__ == '__main__':
     import argparse
@@ -55,7 +57,6 @@ if __name__ == '__main__':
 
     #CHANGE NUMBER OF SAMPLES HERE
     samples = 16
-
 
 
     def create_dataset(num_points, type, save=False, load=False, save_name=None, load_name=None, num_classes=6):
@@ -93,6 +94,7 @@ if __name__ == '__main__':
             if type == "moon":
                 points, labels = make_moons(n_samples=num_points, noise=0.1)
             elif type == "gauss":
+                #This does not have ground truth labels, so just use sklearn kmeans over euclidean distance as "ground truth"
                 points = create_hierarchical_clusters(n=samples, unique_vals=True)
                 euclid_kmeans = KMeans(n_clusters=args.k)
                 euclid_kmeans.fit(points)
@@ -109,19 +111,51 @@ if __name__ == '__main__':
             if save:
                 if save_name is None:
                     save_name = str(datetime.now())
-                np.savetxt(save_name+'.csv', points, delimiter=',')
-                np.savetxt(save_name+'_labels.csv', labels, delimiter=',')
+                np.savetxt("savefiles/datasets/"+save_name+'.csv', points, delimiter=',')
+                np.savetxt("savefiles/datasets/"+save_name+'_labels.csv', labels, delimiter=',')
           
         return points, labels
+    ####################################### END OF METHOD SETUPS ##############################################
 
 
+    #################### RUN PARAMETERS HERE #######################
+    #create_dataset setup:
+    num_points = 10
+    dataset_type = "moon" 
+    save_dataset = True
+    load_dataset = False #If true will override the other params and just load from the filename.
+    save_name = "testingmoon" #Shared for name of images, filename to save the dataset into
+    load_name = "test"
+
+    #visualization parameters - comment in or out the visualization tools in the section below
+    save_visualization = True
+    image_save_name = save_name
+
+    '''
+    Functions that are run:
+    create_dataset: Creates the dataset
+    make_tree: Creates the dc-tree for methods using the old dc-tree setup
+
+    dc_clustering: makes k-center optimal algorithm clustering
+    kmeans.naive_dc_kmeans: makes k-means lloyds algorithm
+    hdbscan.fit: makes hdbscan in euclidean space which implicitly uses dc-dist in the algorithm
+    kmeans_hk.naive_dc_kmeans: makes k-means with no of clusters hdbscan found
+
+    plot_tree: Shows the dc-tree, optionally with centers if provided
+    visualize: Shows the complete graph with chosen distance function
+    plot_embedding: Shows the chosen embeddings
+    '''
+
+    #################### RUN PARAMETERS END  #######################
+
+
+
+
+
     
-    
-    #Point generation with hierarchical clusters, comment in or out these four lines
-    #This does not have ground truth labels, so just use sklearn kmeans over euclidean distance as "ground truth"
-    
-    #End of point generation with hierarchical clusters
-    points, labels = create_dataset(num_points=10, type="moon", save=False, load=False, save_name="test", load_name="test")
+
+    #Create the dataset and old dc_tree setup for methods that need it as input
+    points, labels = create_dataset(num_points=num_points, type=dataset_type, save=save_dataset, load=load_dataset, save_name=save_name, load_name=load_name)
     root, dc_dists = make_tree(
         points,
         labels,
@@ -138,7 +172,74 @@ if __name__ == '__main__':
         min_points=args.min_pts,
     )
 
-    # Change the eps by a tiny amount so that that distance is included in the DBSCAN cuts
+    
+
+    #Default k-value is 4
+    #Change it by calling this python script with command-line argument ".....py --k valueOfK"
+    #Or just by changing the default value above...
+
+    #Default min_pts value is 3 
+    #Again, change in command-line or changing default value above.
+
+    #K-means clustering
+    kmeans = KMEANS(k=args.k)
+    kmeans.naive_dc_kmeans(points=points, minPts=args.min_pts, max_iters=100)
+    #kmeans.plusplus_dc_kmeans(points=points, minPts=args.min_pts, max_iters=100)
+
+    kmeans_labels = kmeans.labels
+    centers = kmeans.centers
+
+
+
+
+    '''
+    HDBSCAN clustering:
+    https://scikit-learn.org/stable/modules/generated/sklearn.cluster.HDBSCAN.html
+    Has following relevant arguments: 
+    - min_cluster_size:
+    - min_samples: defaults to min_cluster_size. This functions as minPts.  
+    - metric: default = 'euclidean'
+
+    '''
+    hdbscan = HDBSCAN(min_samples = args.min_pts)
+    hdbscan.fit(points)
+    hdb_labels = hdbscan.labels_
+
+    num_clusters = len(np.unique(hdb_labels))
+
+    #Kmeans using same number of clusters as hdbscan finds
+    kmeans_hk = KMEANS(k=num_clusters)
+    kmeans_hk.naive_dc_kmeans(points=points, minPts=args.min_pts, max_iters=100)
+    kmeans_labels_hk = kmeans_hk.labels
+
+    k = str(args.k)
+    hk = str(num_clusters)
+    ################################### RESULTS VISUALIZATION #####################################
+
+    #Plot the dc-tree, optionally with the centers from the final kmeans clusters marked in red
+    plot_tree(root, kmeans_labels, kmeans.center_indexes, save=save_visualization, save_name=image_save_name)
+    
+    #Plot the complete graph from the dataset with the specified distance measure on all of the edges. Optionally show the distances in embedded space with MDS.
+    visualize(points=points, cluster_labels=kmeans_labels, minPts=args.min_pts, distance="dc_dist", save=save_visualization, save_name=image_save_name)
+
+    #Plot the final clustering of the datapoints in 2D euclidean space.
+    plot_points = points
+    plot_embedding(
+        plot_points,
+        [labels   , pred_labels             , kmeans_labels , hdb_labels    , kmeans_labels_hk],
+        ['truth'+k, 'k-Center on DC-dists'+k, 'K-means'+k   , 'HDBSCAN' + hk, 'K-means'+ hk],
+        centers=centers,
+        dot_scale=0.5
+    )
+
+
+
+
+
+##################################### OLD CODE #########################################
+
+
+# Change the eps by a tiny amount so that that distance is included in the DBSCAN cuts
     #eps = np.max(epsilons[np.where(epsilons > 0)]) + 1e-8
 
     # DBSCAN*
@@ -162,66 +263,6 @@ if __name__ == '__main__':
     #     n_clusters=args.k,
     #     type_="it"
     # )
-
-    ################################ MY CODE ####################################
-    #Default k-value is 4
-    #Change it by calling this python script with command-line argument ".....py --k valueOfK"
-    #Or just by changing the default value above...
-
-    #Default min_pts value is 3 
-    #Again, change in command-line or changing default value above.
-
-    #K-means clustering
-    kmeans = KMEANS(k=args.k)
-    kmeans.naive_dc_kmeans(points=points, minPts=args.min_pts, max_iters=100)
-    #kmeans.plusplus_dc_kmeans(points=points, minPts=args.min_pts, max_iters=100)
-
-    kmeans_labels = kmeans.labels
-    centers = kmeans.centers
-
-
-
-
-
-    #HDBSCAN clustering
-    '''
-    https://scikit-learn.org/stable/modules/generated/sklearn.cluster.HDBSCAN.html
-    Has following relevant arguments: 
-    - min_cluster_size:
-    - min_samples: defaults to min_cluster_size. This functions as minPts.  
-    - metric: default = 'euclidean'
-
-    '''
-    hdbscan = HDBSCAN(min_samples = args.min_pts)
-    hdbscan.fit(points)
-    hdb_labels = hdbscan.labels_
-
-    num_clusters = len(np.unique(hdb_labels))
-    print("Number of clusters:", num_clusters)
-
-    #Kmeans using same number of clusters as hdbscan finds
-    kmeans2 = KMEANS(k=num_clusters)
-    kmeans2.naive_dc_kmeans(points=points, minPts=args.min_pts, max_iters=100)
-    kmeans_labels2 = kmeans2.labels
-
-
-    plot_tree(root, kmeans_labels, kmeans.center_indexes)
-
-
-    plot_points = points
-    plot_embedding(
-        plot_points,
-        [labels, pred_labels, kmeans_labels, hdb_labels, kmeans_labels2],
-        ['truth'+str(args.k), 'k-Center on DC-dists'+str(args.k), 'K-means'+str(args.k), 'HDBSCAN' + str(num_clusters), 'K-means'+ str(num_clusters)],
-        centers=centers,
-        dot_scale=0.5
-    )
-
-
-
-    ################################ MY CODE END ####################################
-
-
 
 
     # print('Epsilon values per clusters', epsilons)
