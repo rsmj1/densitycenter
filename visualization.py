@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from enum import Enum
 import numba as numba
 from density_tree import make_tree
-
+from tree_plotting import make_node_lists, find_node_positions
 
 
 #Visualizes the distance measure in an embedded space using MDS
@@ -135,10 +135,42 @@ def print_numpy_code(array, newline=True):
 #points = np.array([[1,6],[2,6],[6,2],[14,17],[123,3246],[52,8323],[265,73]])
 
 
+def plot_tree_better(root, labels):
+    edge_list = []
+    dist_list = []
+    color_list = []
+    alpha_list = []
+
+    make_node_lists(root, labels, 1, dist_list, edge_list, color_list, alpha_list)
+    G = nx.Graph()
+    G.add_edges_from(edge_list)
+    pos_list = find_node_positions(root, 10)
+
+    pos_dict = {}
+    dist_dict = {}
+    for i, node in enumerate(G.nodes):
+        pos_dict[node] = pos_list[i]
+        if dist_list[i] > 0:
+            dist_dict[node] = '{:.1f}'.format(dist_list[i])
+        
+    nx.draw_networkx_nodes(G, pos=pos_dict, node_color=color_list, alpha=alpha_list)
+    nx.draw_networkx_edges(G, pos=pos_dict)
+    nx.draw_networkx_labels(G, pos=pos_dict, labels=dist_dict)
+    plt.savefig("tree.png")
+    plt.show()
+
+
+
+
+
+
 #TODO: Add so that I can see Euclidean, Mut Reach, DC and embedding at once
 #TODO: Add so that colors are determined by cluster labelling
 #TODO: Add plot titles that give information about what we are looking at
 #TODO: Add cdist circles
+    
+
+
 
 #Currently creates edges for a complete graph
 def create_edges(distance_matrix, num_neighbors = None):

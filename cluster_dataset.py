@@ -7,6 +7,7 @@ from DBSCAN import DBSCAN
 from sklearn.metrics import normalized_mutual_info_score as nmi
 from sklearn.decomposition import PCA
 import networkx as nx
+from datetime import datetime
 #import hdbscan
 
 from experiment_utils.get_data import get_dataset, make_circles
@@ -53,27 +54,74 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     #CHANGE NUMBER OF SAMPLES HERE
-    samples = 200
+    samples = 16
 
-    # points, labels = get_dataset('synth', num_classes=6, points_per_class=72)
-    # points, labels = get_dataset('coil', class_list=np.arange(1, 20), points_per_class=36)
-    # points, labels = make_circles(
-    #     n_samples=500,
-    #     noise=0.01,
-    #     radii=[0.5, 1.0],
-    #     thicknesses=[0.1, 0.1]
-    # )
-    # points, labels = get_dataset('mnist', num_classes=10, points_per_class=50)
-    points, labels = make_moons(n_samples=samples, noise=0.1)
+
+
+    def create_dataset(num_points, type, save=False, load=False, save_name=None, load_name=None, num_classes=6):
+        """
+        Parameters
+        ----------
+        num_points : int
+            The number of points to be created.
+        
+        type : String
+            The dataset type. Options: moon, gauss, circle, synth, coil, mnist
+        
+        save : Bool, default=False
+            If true, saves the generated dataset and its ground truth labels in .csv files under the provided save_name.
+        
+        load : Bool, default=False
+            If true, loads dataset from .csv files with accompanied ground truth labels.
+
+        save_name : String, default=None
+
+        load_name : String, default=None
+
+        num_classes: Int, default=6
+            This is used if dataset is one of the following: synth, coil, mnist
+        
+        """
+
+        points, labels = None, None
+        if load:
+            if load_name is None:
+                raise ValueError("Load name should not be none when attempting to load a file..")
+            points = np.loadtxt(load_name+'.csv', delimiter=',')
+            labels = np.loadtxt(load_name+'_labels.csv', delimiter=',')
+        else: 
+            if type == "moon":
+                points, labels = make_moons(n_samples=num_points, noise=0.1)
+            elif type == "gauss":
+                points = create_hierarchical_clusters(n=samples, unique_vals=True)
+                euclid_kmeans = KMeans(n_clusters=args.k)
+                euclid_kmeans.fit(points)
+                labels = euclid_kmeans.labels_
+            elif type == "circle":
+                points, labels = make_circles(n_samples=num_points, noise=0.01, radii=[0.5, 1.0], thicknesses=[0.1, 0.1])
+            elif type == "synth":
+                points, labels = get_dataset('synth', num_classes=num_classes, points_per_class=(num_points//num_classes))
+            elif type == "coil":
+                points, labels = get_dataset('coil', class_list=np.arange(1, num_classes), points_per_class=(num_points//num_classes))
+            elif type == "mnist":
+                points, labels = get_dataset('mnist', num_classes=num_classes, points_per_class=(num_points//num_classes))
+            
+            if save:
+                if save_name is None:
+                    save_name = str(datetime.now())
+                np.savetxt(save_name+'.csv', points, delimiter=',')
+                np.savetxt(save_name+'_labels.csv', labels, delimiter=',')
+          
+        return points, labels
+
+
+    
     
     #Point generation with hierarchical clusters, comment in or out these four lines
     #This does not have ground truth labels, so just use sklearn kmeans over euclidean distance as "ground truth"
-    # points = create_hierarchical_clusters(n=samples, unique_vals=True)
-    # euclid_kmeans = KMeans(n_clusters=args.k)
-    # euclid_kmeans.fit(points)
-    # labels = euclid_kmeans.labels_
-    #End of point generation with hierarchical clusters
     
+    #End of point generation with hierarchical clusters
+    points, labels = create_dataset(num_points=10, type="moon", save=False, load=True, save_name="test", load_name="test")
     root, dc_dists = make_tree(
         points,
         labels,
@@ -81,7 +129,6 @@ if __name__ == '__main__':
         make_image=args.plot_tree,
         n_neighbors=args.n_neighbors
     )
-
 
     #K-center
     pred_labels, kcenter_centers, epsilons = dc_clustering(
@@ -131,6 +178,11 @@ if __name__ == '__main__':
 
     kmeans_labels = kmeans.labels
     centers = kmeans.centers
+
+
+
+
+
     #HDBSCAN clustering
     '''
     https://scikit-learn.org/stable/modules/generated/sklearn.cluster.HDBSCAN.html
@@ -144,14 +196,25 @@ if __name__ == '__main__':
     hdbscan.fit(points)
     hdb_labels = hdbscan.labels_
 
+    num_clusters = len(np.unique(hdb_labels))
+    print("Number of clusters:", num_clusters)
+
+    #Kmeans using same number of clusters as hdbscan finds
+    kmeans2 = KMEANS(k=num_clusters)
+    kmeans2.naive_dc_kmeans(points=points, minPts=args.min_pts, max_iters=100)
+    kmeans_labels2 = kmeans2.labels
+
+
+    plot_tree(root, hdb_labels)
 
 
     plot_points = points
     plot_embedding(
         plot_points,
-        [labels, pred_labels, hdb_labels, kmeans_labels],
-        ['truth', 'k-Center on DC-dists', 'HDBSCAN', 'K-means'],
-        centers=centers
+        [labels, pred_labels, kmeans_labels, hdb_labels, kmeans_labels2],
+        ['truth'+str(args.k), 'k-Center on DC-dists'+str(args.k), 'K-means'+str(args.k), 'HDBSCAN' + str(num_clusters), 'K-means'+ str(num_clusters)],
+        centers=centers,
+        dot_scale=0.5
     )
 
 
