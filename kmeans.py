@@ -7,7 +7,8 @@ class KMEANS(object):
   def __init__(self, *, k):
         self.k = k # The number of clusters that the given kmeans algorithm chosen will use
         self.labels = None #the kmeans applied will put the cluster labels here
-        self.centers = None
+        self.centers = None #The point values of the centers
+        self.center_indexes = None #The point indexes in the point list of the centers
 
   def basic_dc_lloyds(self, points, dc_tree, cluster_center_indexes, max_iters=100):
     '''
@@ -46,7 +47,8 @@ class KMEANS(object):
       if np.array_equal(cluster_center_indexes, old_center_indexes):
         print("Stable point reached, stopping at iteration", i)
         break
-  
+    
+    self.center_indexes = cluster_center_indexes
     self.centers = points[cluster_center_indexes]
     self.labels = cluster_assignments
     #print("Final assignments:", self.labels)

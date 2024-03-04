@@ -30,15 +30,23 @@ def find_node_positions(root, width=1, vert_gap=0.2, vert_loc=0, xcenter=0.5, po
 
     return pos
 
-def make_node_lists(root, point_labels, parent_count, dist_list, edge_list, color_list, alpha_list):
+def make_node_lists(root, point_labels, parent_count, dist_list, edge_list, color_list, alpha_list, edgecolor_list, centers=None):
     count = parent_count
     dist_list.append(root.dist)
     if root.is_leaf:
         color_list.append(point_labels[root.point_id])
         alpha_list.append(1)
+        if centers is not None:
+            if root.point_id in centers:
+                edgecolor_list.append("red")
+            else:
+                edgecolor_list.append("black")
+        else:
+            edgecolor_list.append("black")
     else:
         color_list.append(-1)
         alpha_list.append(0.5)
+        edgecolor_list.append("black")
 
     for tree in [root.left_tree, root.right_tree]:
         if tree is not None:
@@ -50,21 +58,24 @@ def make_node_lists(root, point_labels, parent_count, dist_list, edge_list, colo
                 dist_list,
                 edge_list,
                 color_list,
-                alpha_list
+                alpha_list,
+                edgecolor_list,
+                centers
             )
 
     return count
 
-def plot_tree(root, labels):
+def plot_tree(root, labels, centers=None):
     edge_list = []
     dist_list = []
     color_list = []
     alpha_list = []
-
-    make_node_lists(root, labels, 1, dist_list, edge_list, color_list, alpha_list)
+    edgecolor_list = []
+    make_node_lists(root, labels, 1, dist_list, edge_list, color_list, alpha_list, edgecolor_list, centers)
     G = nx.Graph()
     G.add_edges_from(edge_list)
     pos_list = find_node_positions(root, 10)
+
 
     pos_dict = {}
     dist_dict = {}
@@ -72,8 +83,11 @@ def plot_tree(root, labels):
         pos_dict[node] = pos_list[i]
         if dist_list[i] > 0:
             dist_dict[node] = '{:.1f}'.format(dist_list[i])
-        
-    nx.draw_networkx_nodes(G, pos=pos_dict, node_color=color_list, alpha=alpha_list)
+
+
+    
+    print("color_list:", color_list)
+    nx.draw_networkx_nodes(G, pos=pos_dict, node_color=color_list, alpha=alpha_list, edgecolors=edgecolor_list)
     nx.draw_networkx_edges(G, pos=pos_dict)
     nx.draw_networkx_labels(G, pos=pos_dict, labels=dist_dict)
     plt.savefig("tree.png")

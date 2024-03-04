@@ -121,7 +121,7 @@ if __name__ == '__main__':
     #This does not have ground truth labels, so just use sklearn kmeans over euclidean distance as "ground truth"
     
     #End of point generation with hierarchical clusters
-    points, labels = create_dataset(num_points=10, type="moon", save=False, load=True, save_name="test", load_name="test")
+    points, labels = create_dataset(num_points=10, type="moon", save=False, load=False, save_name="test", load_name="test")
     root, dc_dists = make_tree(
         points,
         labels,
@@ -205,7 +205,7 @@ if __name__ == '__main__':
     kmeans_labels2 = kmeans2.labels
 
 
-    plot_tree(root, hdb_labels)
+    plot_tree(root, kmeans_labels, kmeans.center_indexes)
 
 
     plot_points = points
