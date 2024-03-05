@@ -117,11 +117,13 @@ def plot_embedding(embed_points, embed_labels, titles, centers = None, dot_scale
     assert len(embed_labels) == len(titles)
     fig, axes = plt.subplots(1, len(embed_labels))
     fig.set_figwidth(4 * len(embed_labels))
+    co = 0
     for i, labels in enumerate(embed_labels):
         axes[i].scatter(embed_points[:, 0], embed_points[:, 1], c=labels, s=dot_size)
         axes[i].set_title(titles[i])
-        if titles[i] == "K-means" and centers is not None:
-            axes[i].scatter(centers[:, 0], centers[:,1], c="r", s=dot_size)
+        if "K-means" in titles[i] and centers is not None and co == 0:
+            axes[i].scatter(centers[:, 0], centers[:,1], c="none", s=dot_size, edgecolor="r")
+            co += 1
     
     if save:
         if save_name is None:

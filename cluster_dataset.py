@@ -219,11 +219,11 @@ if __name__ == '__main__':
 
     ################################### RESULTS VISUALIZATION #####################################
     #Plot the complete graph from the dataset with the specified distance measure on all of the edges. Optionally show the distances in embedded space with MDS.
-    visualize(points=points, cluster_labels=kmeans_labels, minPts=args.min_pts, distance="dc_dist", save=save_visualization, save_name=image_save_name)
+    visualize(points=points, cluster_labels=kmeans_labels, minPts=args.min_pts, distance="dc_dist", centers=centers, save=save_visualization, save_name=image_save_name)
 
 
     #Plot the dc-tree, optionally with the centers from the final kmeans clusters marked in red
-    plot_tree(root, kmeans_labels, kmeans.center_indexes, save=save_visualization, save_name=image_save_name)
+    #plot_tree(root, kmeans_labels, kmeans.center_indexes, save=save_visualization, save_name=image_save_name)
     
 
     #Plot the final clustering of the datapoints in 2D euclidean space.

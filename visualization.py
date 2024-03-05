@@ -27,7 +27,7 @@ def visualize_embedding(dists, names, distance, labels = None):
 
   plt.show()
 
-def visualize(points, cluster_labels = None, num_neighbors=None, embed = False, distance="dc_dist", minPts=3, show_cdists=False, save=False, save_name=None):
+def visualize(points, cluster_labels = None, num_neighbors=None, embed = False, distance="dc_dist", minPts=3, show_cdists=False, centers=None, save=False, save_name=None):
   '''
   Visualizes the complete graph G over the points with chosen distances on the edges.
 
@@ -40,6 +40,7 @@ def visualize(points, cluster_labels = None, num_neighbors=None, embed = False, 
     distance: The distance function to be used in the visualization. "dc_dist", "euclidean", "mut_reach".
     minPts: The number of points for a point to be a core point, determines core distance.
     show_cdists : Boolean, default=False
+    centers : positions of the centers to be highlighted
     save : Boolean, default=False
     save_name : String, default=None
   '''
@@ -66,9 +67,9 @@ def visualize(points, cluster_labels = None, num_neighbors=None, embed = False, 
   nx.draw_networkx_edges(G, pos=pos_dict, ax=ax, width=0.8)
   nx.draw_networkx_edge_labels(G, pos=pos_dict, edge_labels=edge_labels, ax=ax, font_size=8)
 
+  #Code to show the core distances
   if show_cdists:
      cdists = get_cdists(points, minPts)
-
 
      for i, pos in pos_dict.items():
         circle = plt.Circle(pos, radius=cdists[i-1], edgecolor="black", facecolor="none")
@@ -77,6 +78,12 @@ def visualize(points, cluster_labels = None, num_neighbors=None, embed = False, 
         edge_pos = (pos[0], pos[1]+cdists[i-1])
         ax.plot([pos[0], edge_pos[0]], [pos[1], edge_pos[1]], color='blue', zorder=0, alpha=0.5, linestyle='dotted')
         ax.text(pos[0], pos[1] + cdists[i-1]/2, str(np.round(cdists[i-1], 2)), ha='center', va='bottom', fontsize=6, color='black', rotation=90, bbox=None, zorder=1)
+
+  #Code to highlight potential centers
+  if centers is not None:
+    print("highligthing centers")
+    ax.scatter(centers[:, 0], centers[:,1], c="none", edgecolor="r", zorder=2, s=300)
+     
 
   #Set perspective to be "real"
   ax.set_aspect('equal', adjustable='box')
@@ -200,7 +207,6 @@ def print_numpy_code(array, newline=True):
 #TODO: Add so that I can see Euclidean, Mut Reach, DC and embedding at once
 #TODO: Add so that colors are determined by cluster labelling
 #TODO: Add plot titles that give information about what we are looking at
-#TODO: Add cdist circles: TODOING
     
 def get_cdists(points, min_pts):
     '''
@@ -261,4 +267,4 @@ def main():
     visualize(points=points, cluster_labels=labels, embed=True, distance=dist, minPts=minPts, show_cdists=True)
     #print_numpy_code(points)
 
-main()
+#main()
