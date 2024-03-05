@@ -14,11 +14,11 @@ def merge_components(c_i, c_j):
     merged_list = c_i.nodes.union(c_j.nodes)
     return Component(merged_list, c_i.comp_id)
 
-
+#Takes as input the euclidean distance matrix D
 def get_reach_dists(D, min_points, num_points):
     # Get reachability for each point with respect to min_points parameter
     reach_dists = np.sort(D, axis=1)
-    reach_dists = reach_dists[:, min_points - 1]
+    reach_dists = reach_dists[:, min_points - 1] #These are the core-distances for each point.
 
     # Make into an NxN matrix
     reach_dists_i, reach_dists_j = np.meshgrid(reach_dists, reach_dists)
