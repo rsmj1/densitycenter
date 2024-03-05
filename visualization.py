@@ -33,16 +33,35 @@ def visualize(points, cluster_labels = None, num_neighbors=None, embed = False, 
 
   Parameters
   ----------
-    points: The points to be visualized.
-    cluster_labels: This shows a distinct color for each ground truth cluster a point is a part of.
-    num_neighbors: Will be used to make graph less complete - only num_neighbors closest points will have edges. If none the graph will be complete
-    embed: If true, will show the distances in embedded space with MDS.
-    distance: The distance function to be used in the visualization. "dc_dist", "euclidean", "mut_reach".
-    minPts: The number of points for a point to be a core point, determines core distance.
+    points: Numpy.Array
+      The points to be visualized in a numpy 2D array
+
+    cluster_labels: Numpy.Array, default=None 
+      This shows a distinct color for each ground truth cluster a point is a part of, should be a 1D array with a label for each point. If None, will make all points blue.
+
+    num_neighbors: Int, default=None
+      Will be used to make graph less complete - only num_neighbors closest points will have edges. If none the graph will be complete
+    
+    embed : Boolean, default=False
+      If true, will show the distances in embedded space with MDS.
+    
+    distance : String, default="dc_dist"
+      The distance function to be used in the visualization. "dc_dist", "euclidean", "mut_reach".
+    
+    minPts: Int, default=3
+      The number of points for a point to be a core point, determines core distance.
+
     show_cdists : Boolean, default=False
-    centers : positions of the centers to be highlighted
+      Will make a circle with cdist radius from each point if true. Will have a dotted line to circle's edge showing the cdist value.
+    
+    centers : Numpy.Array, default=None
+      Positions of the centers to be highlighted
+    
     save : Boolean, default=False
+      If true will save the plot under the save_name.
+    
     save_name : String, default=None
+      The name to save the plot under.
   '''
 
   dists = get_dists(distance, points, minPts)
@@ -102,7 +121,6 @@ def visualize(points, cluster_labels = None, num_neighbors=None, embed = False, 
         plt.savefig("savefiles/images/"+save_name+"_graph.png")
 
   plt.show()
-
 
 
 @numba.njit(fastmath=True, parallel=True)
@@ -200,13 +218,6 @@ def print_numpy_code(array, newline=True):
 
 #points = np.array([[1,6],[2,6],[6,2],[14,17],[123,3246],[52,8323],[265,73]])
 
-
-
-
-
-#TODO: Add so that I can see Euclidean, Mut Reach, DC and embedding at once
-#TODO: Add so that colors are determined by cluster labelling
-#TODO: Add plot titles that give information about what we are looking at
     
 def get_cdists(points, min_pts):
     '''

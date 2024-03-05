@@ -28,7 +28,7 @@ class KMEANS(object):
       #print("Yielding the following cluster assignments:", cluster_assignments)
       #No need to create new clusters for last iteration
       if i == max_iters -1:
-         print("Max iters reached")
+         print("Max iters reached") 
          continue
       
       #Create new clusters by finding point with smallest distance to all other points within cluster

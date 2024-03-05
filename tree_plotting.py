@@ -71,6 +71,18 @@ def make_node_lists(root, point_labels, parent_count, dist_list, edge_list, colo
     return count
 
 def plot_tree(root, labels, centers=None, save=False, save_name=None):
+    '''
+    Plots the dc-dist tree, optionally highligthing nodes chosen as centers. Shows the node indexes on the leaves and dc-distances in the non-leaf nodes. The leaves are color-coded by the provided labels.
+    
+    Parameters
+    ----------
+
+    root : DensityTree
+    labels : Numpy.Array
+    centers : Numpy.Array, default=None
+    save : Boolean, default=False
+    save_name : String, default=None
+    '''
     dist_dict = {}
 
     edge_list = []
@@ -106,6 +118,20 @@ def plot_tree(root, labels, centers=None, save=False, save_name=None):
 
 
 def plot_embedding(embed_points, embed_labels, titles, centers = None, dot_scale = 1, save=False, save_name=None):
+    '''
+    Plots the provided points with as many embeddings as there are sets of lables and titles. Will highlight centers in k-means embeddings if provided.
+
+    Parameters
+    ----------
+
+    embed_points : Numpy.Array
+    embed_labels : List[Numpy.Array]
+    titles : List[String]
+    centers : Numpy.Array, default=None
+    dot_scale : Float, default=1
+    save : Boolean, default=False
+    save_name : String, default=None
+    '''
     dot_size = (plt.rcParams['lines.markersize'] ** 2) * dot_scale
 
     if len(embed_points.shape) == 1:

@@ -150,10 +150,6 @@ if __name__ == '__main__':
 
 
 
-
-
-    
-
     #Create the dataset and old dc_tree setup for methods that need it as input
     points, labels = create_dataset(num_points=num_points, type=dataset_type, save=save_dataset, load=load_dataset, save_name=save_name, load_name=load_name)
     root, dc_dists = make_tree(
@@ -223,7 +219,7 @@ if __name__ == '__main__':
 
 
     #Plot the dc-tree, optionally with the centers from the final kmeans clusters marked in red
-    #plot_tree(root, kmeans_labels, kmeans.center_indexes, save=save_visualization, save_name=image_save_name)
+    plot_tree(root, kmeans_labels, kmeans.center_indexes, save=save_visualization, save_name=image_save_name)
     
 
     #Plot the final clustering of the datapoints in 2D euclidean space.
