@@ -9,6 +9,7 @@ import numba as numba
 from density_tree import make_tree
 from tree_plotting import make_node_lists, find_node_positions
 from datetime import datetime
+from matplotlib.widgets import Button, RadioButtons, CheckButtons
 
 
 def visualize_embedding(dists, names, distance, labels = None):
@@ -122,7 +123,10 @@ def visualize(points, cluster_labels = None, num_neighbors=None, embed = False, 
 
   plt.show()
 
-
+#TODO: Add interactive button activating / deactivating cdists. use matplotlib.widgets.Button. Should be able to give it arguments. Need to keep the circles in a data structure, otherwise cannot disable cdists again. 
+#TODO: Make it possible to change the distances on the edges between the different ones also via buttons, in this case Radiobuttons.
+#TODO: Make on hover info about distances. https://stackoverflow.com/questions/61604636/adding-tooltip-for-nodes-in-python-networkx-graph
+  
 @numba.njit(fastmath=True, parallel=True)
 def get_dist_matrix(points, D, dim, num_points):
     '''

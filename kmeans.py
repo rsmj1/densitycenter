@@ -33,8 +33,6 @@ class KMEANS(object):
       
       #Create new clusters by finding point with smallest distance to all other points within cluster
       #This is currently an n^2 operation...
-      #TODO: This can be improved by using the distances method which will make the matrix very efficiently. From there, we just take the mean in each row.
-      #However, still n^2 to take the mean in each row
       for c in range(self.k):
          #Find indexes of points part of cluster c
          cluster_indexes = np.nonzero(cluster_assignments == c)[0]
@@ -45,7 +43,8 @@ class KMEANS(object):
          #print("chose index:", cluster_center_indexes[c])
 
       if np.array_equal(cluster_center_indexes, old_center_indexes):
-        print("Stable point reached, stopping at iteration", i)
+        print("K is",self.k , "and stable point reached, stopping at iteration", i)
+        #print("Cluster center indexes:", cluster_center_indexes)
         break
     
     self.center_indexes = cluster_center_indexes
@@ -55,16 +54,16 @@ class KMEANS(object):
 
 
   def plusplus_dc_kmeans(self, points, minPts, max_iters=100):
+    '''
+    Choose one center uniformly at random among the data points. \n
+    For each data point x not chosen yet, compute D(x), the distance between x and the nearest center that has already been chosen. \n
+    Choose one new data point at random as a new center, using a weighted probability distribution where a point x is chosen with probability proportional to D(x)^2. \n
+    Repeat Steps 2 and 3 until k centers have been chosen. \n
+    Now that the initial centers have been chosen, proceed using standard k-means clustering. \n
+    '''
+    
     n = points.shape[0]
     dc_tree = dcdist.DCTree(points, min_points=minPts, n_jobs=1)
-
-    '''
-    Choose one center uniformly at random among the data points.
-    For each data point x not chosen yet, compute D(x), the distance between x and the nearest center that has already been chosen.
-    Choose one new data point at random as a new center, using a weighted probability distribution where a point x is chosen with probability proportional to D(x)2.
-    Repeat Steps 2 and 3 until k centers have been chosen.
-    Now that the initial centers have been chosen, proceed using standard k-means clustering.
-    '''
     #Keep set of points that might be chosen as new centers
     #I use a numpy array rather than a set since choosing a random element from a set is inefficient and furthermore does not allow me to use the dc_tree.distances() function
     if self.k >= n:
@@ -104,6 +103,38 @@ class KMEANS(object):
     cluster_center_indexes = np.random.choice(n, self.k, False)
     self.basic_dc_lloyds(points, dc_tree, cluster_center_indexes, max_iters)
 
+
+  def kmeans_loss(self, points, centers, dc_tree):
+    '''
+    Computes the K-means loss, given k provided centers: 
+      Sum for each point in points: dist from point to closest center squared
+    
+    Parameters
+    ----------
+
+    points : Numpy.array
+      The set of points over which the loss is computed.
+    
+    centers : Numpy.array
+      The indexes into points of the chosen centers.
+    
+    dc_tree : DCTree
+      The dc-tree over the points.
+    '''     
+    n = points.shape[0]
+    dists = np.array([[dc_tree.dc_dist(c,p_index) for c in centers] for p_index in range(n)])
+    print("dists:", dists)
+    cluster_dists = np.min(dists, axis=1)
+    print("cluster_dists:", cluster_dists)
+    loss = np.sum(cluster_dists**2)
+    
+    return loss
+
+  def assign_points(self, points, centers, dc_tree):
+    n = points.shape[0]
+    dists = np.array([[dc_tree.dc_dist(c,p_index) for c in centers] for p_index in range(n)])
+    cluster_assignments = np.argmin(dists, axis=1)
+    return cluster_assignments
 
 
 #Basic testing:

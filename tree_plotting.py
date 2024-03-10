@@ -46,7 +46,10 @@ def make_node_lists(root, point_labels, parent_count, dist_list, edge_list, colo
             else:
                 edgecolor_list.append("black")
         else:
-            edgecolor_list.append("black")
+            if point_labels[root.point_id] != -1:
+                edgecolor_list.append("black")
+            else:
+                edgecolor_list.append("yellow")
     else:
         color_list.append(-1)
         alpha_list.append(0.5)
@@ -98,16 +101,16 @@ def plot_tree(root, labels, centers=None, save=False, save_name=None):
     pos_dict = {}
     for i, node in enumerate(G.nodes):
         pos_dict[node] = pos_list[i]
-
-        dist_dict[node] = '{:.1f}'.format(dist_list[i]) if dist_list[i] % 1 != 0 else '{:.0f}'.format(dist_list[i])
+        #+1 for {:.0f} as these are the node numbers which are 0 indexed from the point_ids in the tree, but are 1-indexed in the other visualizations.
+        dist_dict[node] = '{:.2f}'.format(dist_list[i]) if dist_list[i] % 1 != 0 else '{:.0f}'.format(dist_list[i]+1)
 
     
     plt.title("dc-distance tree with n=" + str(len(labels)))
     
-    nx.draw_networkx_nodes(G, pos=pos_dict, node_color=color_list, alpha=alpha_list, edgecolors=edgecolor_list)
+    nx.draw_networkx_nodes(G, pos=pos_dict, node_color=color_list, alpha=alpha_list, edgecolors=edgecolor_list, linewidths=1.5)
     nx.draw_networkx_edges(G, pos=pos_dict)
-    nx.draw_networkx_labels(G, pos=pos_dict, labels=dist_dict)
-
+    nx.draw_networkx_labels(G, pos=pos_dict, labels=dist_dict, font_size=8)
+    
 
     if save:
         if save_name is None:

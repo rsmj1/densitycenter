@@ -25,7 +25,7 @@ from sklearn.cluster import HDBSCAN
 from sklearn.cluster import KMeans
 from point_gen import create_hierarchical_clusters
 from visualization import visualize
-
+from benchmark import create_dataset
 
 if __name__ == '__main__':
     import argparse
@@ -55,72 +55,12 @@ if __name__ == '__main__':
     )
     args = parser.parse_args()
 
-    #CHANGE NUMBER OF SAMPLES HERE
-    samples = 16
 
-
-    def create_dataset(num_points, type, save=False, load=False, save_name=None, load_name=None, num_classes=6):
-        """
-        Parameters
-        ----------
-        num_points : int
-            The number of points to be created.
-        
-        type : String
-            The dataset type. Options: moon, gauss, circle, synth, coil, mnist
-        
-        save : Bool, default=False
-            If true, saves the generated dataset and its ground truth labels in .csv files under the provided save_name.
-        
-        load : Bool, default=False
-            If true, loads dataset from .csv files with accompanied ground truth labels.
-
-        save_name : String, default=None
-
-        load_name : String, default=None
-
-        num_classes: Int, default=6
-            This is used if dataset is one of the following: synth, coil, mnist
-        
-        """
-
-        points, labels = None, None
-        if load:
-            if load_name is None:
-                raise ValueError("Load name should not be none when attempting to load a file..")
-            points = np.loadtxt(load_name+'.csv', delimiter=',')
-            labels = np.loadtxt(load_name+'_labels.csv', delimiter=',')
-        else: 
-            if type == "moon":
-                points, labels = make_moons(n_samples=num_points, noise=0.1)
-            elif type == "gauss":
-                #This does not have ground truth labels, so just use sklearn kmeans over euclidean distance as "ground truth"
-                points = create_hierarchical_clusters(n=samples, unique_vals=True)
-                euclid_kmeans = KMeans(n_clusters=args.k)
-                euclid_kmeans.fit(points)
-                labels = euclid_kmeans.labels_
-            elif type == "circle":
-                points, labels = make_circles(n_samples=num_points, noise=0.01, radii=[0.5, 1.0], thicknesses=[0.1, 0.1])
-            elif type == "synth":
-                points, labels = get_dataset('synth', num_classes=num_classes, points_per_class=(num_points//num_classes))
-            elif type == "coil":
-                points, labels = get_dataset('coil', class_list=np.arange(1, num_classes), points_per_class=(num_points//num_classes))
-            elif type == "mnist":
-                points, labels = get_dataset('mnist', num_classes=num_classes, points_per_class=(num_points//num_classes))
-            
-            if save:
-                if save_name is None:
-                    save_name = str(datetime.now())
-                np.savetxt("savefiles/datasets/"+save_name+'.csv', points, delimiter=',')
-                np.savetxt("savefiles/datasets/"+save_name+'_labels.csv', labels, delimiter=',')
-          
-        return points, labels
-    ####################################### END OF METHOD SETUPS ##############################################
 
 
     #################### RUN PARAMETERS HERE #######################
     #create_dataset setup:
-    num_points = 10
+    num_points = 16
     dataset_type = "moon" 
     save_dataset = False
     load_dataset = False #If true will override the other params and just load from the filename.
@@ -179,8 +119,7 @@ if __name__ == '__main__':
 
     #K-means clustering
     kmeans = KMEANS(k=args.k)
-    kmeans.naive_dc_kmeans(points=points, minPts=args.min_pts, max_iters=100)
-    #kmeans.plusplus_dc_kmeans(points=points, minPts=args.min_pts, max_iters=100)
+    kmeans.plusplus_dc_kmeans(points=points, minPts=args.min_pts, max_iters=100)
 
     kmeans_labels = kmeans.labels
     centers = kmeans.centers
@@ -192,12 +131,12 @@ if __name__ == '__main__':
     HDBSCAN clustering:
     https://scikit-learn.org/stable/modules/generated/sklearn.cluster.HDBSCAN.html
     Has following relevant arguments: 
-    - min_cluster_size:
+    - min_cluster_size: default=5
     - min_samples: defaults to min_cluster_size. This functions as minPts.  
     - metric: default = 'euclidean'
 
     '''
-    hdbscan = HDBSCAN(min_samples = args.min_pts)
+    hdbscan = HDBSCAN(min_cluster_size=2, min_samples = args.min_pts)
     hdbscan.fit(points)
     hdb_labels = hdbscan.labels_
 
@@ -205,13 +144,14 @@ if __name__ == '__main__':
 
     #Kmeans using same number of clusters as hdbscan finds
     kmeans_hk = KMEANS(k=num_clusters)
-    kmeans_hk.naive_dc_kmeans(points=points, minPts=args.min_pts, max_iters=100)
+    kmeans_hk.plusplus_dc_kmeans(points=points, minPts=args.min_pts, max_iters=100)
     kmeans_labels_hk = kmeans_hk.labels
 
     k = str(args.k)
     hk = str(num_clusters)
 
-
+    print("HDB K:", hk)
+    print("HBB labels:", hdb_labels)
 
     ################################### RESULTS VISUALIZATION #####################################
     #Plot the complete graph from the dataset with the specified distance measure on all of the edges. Optionally show the distances in embedded space with MDS.
@@ -219,8 +159,9 @@ if __name__ == '__main__':
 
 
     #Plot the dc-tree, optionally with the centers from the final kmeans clusters marked in red
-    plot_tree(root, kmeans_labels, kmeans.center_indexes, save=save_visualization, save_name=image_save_name)
-    
+    #plot_tree(root, kmeans_labels, kmeans.center_indexes, save=save_visualization, save_name=image_save_name)
+    plot_tree(root, hdb_labels, None, save=save_visualization, save_name=image_save_name)
+
 
     #Plot the final clustering of the datapoints in 2D euclidean space.
     plot_points = points
@@ -231,49 +172,3 @@ if __name__ == '__main__':
         centers=centers,
         dot_scale=0.5
     )
-
-
-
-
-
-##################################### OLD CODE #########################################
-
-
-# Change the eps by a tiny amount so that that distance is included in the DBSCAN cuts
-    #eps = np.max(epsilons[np.where(epsilons > 0)]) + 1e-8
-
-    # DBSCAN*
-    # dbscan_orig = DBSCAN(eps=eps, min_pts=args.min_pts, cluster_type='corepoints')
-    # dbscan_orig.fit(points)
-
-    # dbscan_core_pt_inds = np.where(dbscan_orig.labels_ > -1)
-    # dc_core_pt_inds = np.where(np.logical_and(pred_labels > -1, dbscan_orig.labels_ > -1))
-
-    # Ultrametric Spectral Clustering
-    # no_lambdas = get_lambdas(root, eps)
-    # dsnenns = get_dc_dist_matrix(points, args.n_neighbors, min_points=args.min_pts)
-    # sim = get_sim_mx(dsnenns)
-    # sc_, sc_labels = run_spectral_clustering(
-    #     root,
-    #     sim,
-    #     dc_dists,
-    #     eps=eps,
-    #     it=no_lambdas,
-    #     min_pts=args.min_pts,
-    #     n_clusters=args.k,
-    #     type_="it"
-    # )
-
-
-    # print('Epsilon values per clusters', epsilons)
-    # print('NMI spectral vs. k-center:', nmi(sc_labels, pred_labels))
-    # print('NMI spectral vs. DBSCAN*:', nmi(sc_labels, dbscan_orig.labels_))
-    # print('NMI DBSCAN* vs. k-center:', nmi(dbscan_orig.labels_, pred_labels))
-
-    # plot_points = points
-    # plot_embedding(
-    #     plot_points,
-    #     [labels, pred_labels, dbscan_orig.labels_, sc_labels],
-    #     ['truth', 'k-Center on DC-dists', 'DBSCAN*', 'Ultrametric Spectral Clustering'],
-    #     centers=centers
-    # )
