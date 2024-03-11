@@ -137,7 +137,12 @@ def finalize_clusters(clusters):
     if the new X positions are still less than the maximum epsilon.
     """
     epsilons = np.array([c.peak.dist for c in clusters])
-    max_eps = np.max(epsilons[np.where(epsilons > 0)]) + 1e-8
+    nonzeros = epsilons[np.where(epsilons > 0)]
+    if nonzeros.shape[0] == 0:
+        max_eps = 1e-8
+    else:
+        max_eps = np.max(nonzeros) + 1e-8
+
     for cluster in clusters:
         while cluster.peak.parent.dist < max_eps:
             cluster.peak = cluster.peak.parent

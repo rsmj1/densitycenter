@@ -24,13 +24,13 @@ from kmeans import KMEANS
 from sklearn.cluster import HDBSCAN
 from sklearn.cluster import KMeans
 from point_gen import create_hierarchical_clusters
-from visualization import visualize
+from visualization import visualize, print_numpy_code
 from itertools import chain, combinations
 import efficientdcdist.dctree as dcdist
 
 
 
-def create_dataset(num_points, type, save=False, load=False, save_name=None, load_name=None, num_classes=6):
+def create_dataset(num_points, type, save=False, load=False, save_name=None, load_name=None, num_classes=6, k=4):
     """
     Parameters
     ----------
@@ -59,8 +59,9 @@ def create_dataset(num_points, type, save=False, load=False, save_name=None, loa
     if load:
         if load_name is None:
             raise ValueError("Load name should not be none when attempting to load a file..")
-        points = np.loadtxt(load_name+'.csv', delimiter=',')
-        labels = np.loadtxt(load_name+'_labels.csv', delimiter=',')
+        points = np.loadtxt("savefiles/datasets/"+load_name+'.csv', delimiter=',')
+        labels = np.loadtxt("savefiles/datasets/"+load_name+'_labels.csv', delimiter=',')
+        print("Loaded file \"" + load_name + "\", with "+ str(points.shape[0]) + " points.")
     else: 
         if type == "moon":
             points, labels = make_moons(n_samples=num_points, noise=0.1)
@@ -93,13 +94,13 @@ def normalize_cluster_ordering(cluster_labels):
     Normalizes the clustering labels so that the first cluster label encountered is labelled 0, the next 1 and so on. 
     Preserves noise labelled as -1. Useful for clustering comparisons.
     '''
-    print("cluster_labels.shape", cluster_labels.shape)
+    print("cluster_labels before:", cluster_labels)
     n = cluster_labels.shape[0]
-    print("n:", n)
     cluster_index = 0
     cluster_index_mapping = {}
     mapped_labels = set()
-    norm_cluster_labels = np.empty(n)
+    mapped_labels.add(-1)
+    norm_cluster_labels = np.empty(n, dtype=np.int64)
 
     for i, label in enumerate(cluster_labels):
         if label not in mapped_labels:
@@ -114,172 +115,80 @@ def normalize_cluster_ordering(cluster_labels):
         else:
             norm_cluster_labels[i] = cluster_index_mapping[label]
 
+    print("cluster_labels after:", norm_cluster_labels)
     return norm_cluster_labels
 ####################################### END OF METHOD SETUPS ##############################################
 
 
-#################### RUN PARAMETERS HERE #######################
-#create_dataset setup: #TODO Make into run class possibly
-k = 4
-min_pts = 3
-num_points = 16
-plot_tree_bool = False
-n_neighbors = 15
-dataset_type = "moon" 
-save_dataset = False
-load_dataset = False #If true will override the other params and just load from the filename.
-save_name = "testingmoon" #Shared for name of images, filename to save the dataset into
-load_name = "test"
-
-#visualization parameters - comment in or out the visualization tools in the section below
-save_visualization = False
-image_save_name = save_name
-
-'''
-Functions that are run:
-create_dataset: Creates the dataset
-make_tree: Creates the dc-tree for methods using the old dc-tree setup
-
-dc_clustering: makes k-center optimal algorithm clustering
-kmeans.naive_dc_kmeans: makes k-means lloyds algorithm
-hdbscan.fit: makes hdbscan in euclidean space which implicitly uses dc-dist in the algorithm
-kmeans_hk.naive_dc_kmeans: makes k-means with no of clusters hdbscan found
-
-plot_tree: Shows the dc-tree, optionally with centers if provided
-visualize: Shows the complete graph with chosen distance function
-plot_embedding: Shows the chosen embeddings
-'''
-
-#################### RUN PARAMETERS END  #######################
-
-
-
-#Create the dataset and old dc_tree setup for methods that need it as input
-points, labels = create_dataset(num_points=num_points, type=dataset_type, save=save_dataset, load=load_dataset, save_name=save_name, load_name=load_name)
-root, dc_dists = make_tree(
-    points,
-    labels,
-    min_points=min_pts,
-    make_image=plot_tree_bool,
-    n_neighbors=n_neighbors
-)
-
-#K-center
-pred_labels, kcenter_centers, epsilons = dc_clustering(
-    root,
-    num_points=len(labels),
-    k=k,
-    min_points=min_pts,
-)
-
-
-
-#Default k-value is 4
-#Change it by calling this python script with command-line argument ".....py --k valueOfK"
-#Or just by changing the default value above...
-
-#Default min_pts value is 3 
-#Again, change in command-line or changing default value above.
-
-#K-means clustering
-kmeans = KMEANS(k=k)
-kmeans.plusplus_dc_kmeans(points=points, minPts=min_pts, max_iters=100)
-
-kmeans_labels = kmeans.labels
-centers = kmeans.centers
-
-
-
-
-'''
-HDBSCAN clustering:
-https://scikit-learn.org/stable/modules/generated/sklearn.cluster.HDBSCAN.html
-Has following relevant arguments: 
-- min_cluster_size: default=5
-- min_samples: defaults to min_cluster_size. This functions as minPts.  
-- metric: default = 'euclidean'
-
-'''
-hdbscan = HDBSCAN(min_cluster_size=2, min_samples = min_pts)
-hdbscan.fit(points)
-hdb_labels = hdbscan.labels_
-
-num_clusters = len(np.unique(hdb_labels))
-
-#Kmeans using same number of clusters as hdbscan finds
-kmeans_hk = KMEANS(k=num_clusters)
-kmeans_hk.plusplus_dc_kmeans(points=points, minPts=min_pts, max_iters=100)
-kmeans_labels_hk = kmeans_hk.labels
-
-k = str(k)
-hk = str(num_clusters)
-
-print("HDB K:", hk)
-print("HBB labels:", hdb_labels)
-
-################################### RESULTS VISUALIZATION #####################################
-#Plot the complete graph from the dataset with the specified distance measure on all of the edges. Optionally show the distances in embedded space with MDS.
-visualize(points=points, cluster_labels=kmeans_labels, minPts=min_pts, distance="dc_dist", centers=centers, save=save_visualization, save_name=image_save_name)
-
-
-#Plot the dc-tree, optionally with the centers from the final kmeans clusters marked in red
-#plot_tree(root, kmeans_labels, kmeans.center_indexes, save=save_visualization, save_name=image_save_name)
-plot_tree(root, hdb_labels, None, save=save_visualization, save_name=image_save_name)
-
-
-#Plot the final clustering of the datapoints in 2D euclidean space.
-plot_points = points
-plot_embedding(
-    plot_points,
-    [labels   , pred_labels             , kmeans_labels , hdb_labels    , kmeans_labels_hk],
-    ['truth'+k, 'k-Center on DC-dists'+k, 'K-means'+k   , 'HDBSCAN' + hk, 'K-means'+ hk],
-    centers=centers,
-    dot_scale=0.5
-)
-
-
-
-def brute_force_comparision(num_points, min_pts):
+def brute_force_comparision(num_points, min_pts, max_iters=100):
     '''
     Check if solution to HDBSCAN is equal to K-means given the K output by HDBSCAN. 
     This entails running HDBSCAN, getting its label output and the number of clusters k. Then K-means is run in a brute-force manner given that k and all possible ways to choose centers given this, and finding the choice that yields the optimal loss. Then this solution should give the same clusters as HDBSCAN.
     If no such optimal solution exists, it saves the instance.
 
     '''
-    dc_tree = dcdist.DCTree(points, min_points=min_pts, n_jobs=1)
+    is_equal = True
+    counter = 0
+    bad_dataset = None
 
-    dataset_type = "moon"
-    #Generate the dataset
-    points, _ = create_dataset(num_points=num_points, type=dataset_type, save=False, load=False)
+    while is_equal or counter >= max_iters:
 
+        dataset_type = "moon"
+        #Generate the dataset
+        points, _ = create_dataset(num_points=num_points, type=dataset_type, save=False, load=False)
+        
+        dc_tree = dcdist.DCTree(points, min_points=min_pts, n_jobs=1)
+
+        
+        #Run HDBSCAN
+        hdbscan = HDBSCAN(min_cluster_size=2, min_samples = min_pts)
+        hdbscan.fit(points)
+        hdb_labels = hdbscan.labels_
+
+        k = len(np.unique(hdb_labels))
+        if np.isin(-1, hdb_labels) and k != 1:
+            k -= 1
+
+        indexes = np.arange(num_points)
+        kmeans = KMEANS(k=k)
+        best_loss = np.inf
+        best_centers = None
+
+        #Make for loop here, checking all possible ways to choose k centers (their indexes) and their optimum.
+        for c_c in combinations(indexes, k):
+            cluster_combo = np.array(c_c)
+            print("combo:", cluster_combo)
+
+            curr_loss = kmeans.kmeans_loss(points, cluster_combo, dc_tree)
+            if curr_loss < best_loss:
+                best_loss = curr_loss
+                best_centers = cluster_combo.copy()
+        
+        #Check equality between best kmeans clusters and HDBSCAN solution TODO: At some point add version that also checks how similar they are, not just if equal or not.
+        kmeans_labels = kmeans.assign_points(points, best_centers, dc_tree)
+        kmeans_labels_norm = normalize_cluster_ordering(kmeans_labels)
+        hdb_labels_norm = normalize_cluster_ordering(hdb_labels)
+        print("kmeans_labels_norm:", kmeans_labels_norm)
+        print("hdb_labels_norm", hdb_labels_norm)
+
+        if not np.array_equal(kmeans_labels_norm, hdb_labels_norm):
+            is_equal = False
+            bad_dataset = points
+        counter += 1
     
-    #Run HDBSCAN
-    hdbscan = HDBSCAN(min_cluster_size=1, min_samples = min_pts)
-    hdbscan.fit(points)
-    hdb_labels = hdbscan.labels_
-
-    k = len(np.unique(hdb_labels))
-
-    indexes = np.arrange(num_points)
-    kmeans = KMEANS(k=k)
-    best_loss = np.inf
-    best_centers = None
-
-    #Make for loop here, checking all possible ways to choose k centers (their indexes) and their optimum.
-    for cluster_combo in combinations(indexes, k):
-        print("combo:", cluster_combo)
-
-        curr_loss = kmeans.kmeans_loss(points, cluster_combo, dc_tree)
-        if curr_loss < best_loss:
-            best_loss = curr_loss
-            best_centers = cluster_combo.copy()
-    
-    #Check equality between best kmeans clusters and HDBSCAN solution TODO: At some point add version that also checks how similar they are, not just if equal or not.
-    kmeans_labels = kmeans.assign_points(points, best_centers, dc_tree)
-
-
+    if not is_equal:
+        print("They were not equal in an instance with k =", k)
+        print_numpy_code(points)
+    else:
+        print("They were equal across all "+str(counter)+" instances!")
 
     return
+
+
+    
+
+if __name__ == "__main__":
+    brute_force_comparision(num_points=10, min_pts=3)
 
 
 

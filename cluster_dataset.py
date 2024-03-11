@@ -27,45 +27,19 @@ from point_gen import create_hierarchical_clusters
 from visualization import visualize
 from benchmark import create_dataset
 
-if __name__ == '__main__':
-    import argparse
-    parser = argparse.ArgumentParser()
-    parser.add_argument(
-        '--min-pts',
-        type=int,
-        default=3,
-        help='Min points parameter to use for density-connectedness'
-    )
-    parser.add_argument(
-        '--k',
-        type=int,
-        default=4,
-        help='Number of clusters for density-connected k-means'
-    )
-    parser.add_argument(
-        '--n-neighbors',
-        type=int,
-        default=15,
-        help='Dummy variable for compatibility with UMAP/tSNE distance calculation'
-    )
-    parser.add_argument(
-        '--plot-tree',
-        action='store_true',
-        help='If present, will make a plot of the tree'
-    )
-    args = parser.parse_args()
-
-
-
-
+if __name__ == '__main__': 
     #################### RUN PARAMETERS HERE #######################
-    #create_dataset setup:
-    num_points = 16
+
+    num_points = 10
+    k = 2
+    min_pts = 2
+    plot_tree_bool = False
+    n_neighbors = 15
     dataset_type = "moon" 
     save_dataset = False
-    load_dataset = False #If true will override the other params and just load from the filename.
-    save_name = "testingmoon" #Shared for name of images, filename to save the dataset into
-    load_name = "test"
+    load_dataset = True #If true will override the other params and just load from the filename.
+    save_name = "simple4moon" #Shared for name of images, filename to save the dataset into
+    load_name = "simple4moon"
 
     #visualization parameters - comment in or out the visualization tools in the section below
     save_visualization = False
@@ -93,33 +67,22 @@ if __name__ == '__main__':
     #Create the dataset and old dc_tree setup for methods that need it as input
     points, labels = create_dataset(num_points=num_points, type=dataset_type, save=save_dataset, load=load_dataset, save_name=save_name, load_name=load_name)
     root, dc_dists = make_tree(
-        points,
-        labels,
-        min_points=args.min_pts,
-        make_image=args.plot_tree,
-        n_neighbors=args.n_neighbors
+    points,
+    labels,
+    min_points=min_pts,
+    make_image=plot_tree_bool,
+    n_neighbors=n_neighbors
     )
 
     #K-center
-    pred_labels, kcenter_centers, epsilons = dc_clustering(
-        root,
-        num_points=len(labels),
-        k=args.k,
-        min_points=args.min_pts,
-    )
+    pred_labels, kcenter_centers, epsilons = dc_clustering(root, num_points=len(labels), k=k, min_points=min_pts,)
 
     
 
-    #Default k-value is 4
-    #Change it by calling this python script with command-line argument ".....py --k valueOfK"
-    #Or just by changing the default value above...
-
-    #Default min_pts value is 3 
-    #Again, change in command-line or changing default value above.
 
     #K-means clustering
-    kmeans = KMEANS(k=args.k)
-    kmeans.plusplus_dc_kmeans(points=points, minPts=args.min_pts, max_iters=100)
+    kmeans = KMEANS(k=k)
+    kmeans.plusplus_dc_kmeans(points=points, minPts=min_pts, max_iters=100)
 
     kmeans_labels = kmeans.labels
     centers = kmeans.centers
@@ -136,7 +99,7 @@ if __name__ == '__main__':
     - metric: default = 'euclidean'
 
     '''
-    hdbscan = HDBSCAN(min_cluster_size=2, min_samples = args.min_pts)
+    hdbscan = HDBSCAN(min_cluster_size=2, min_samples = min_pts)
     hdbscan.fit(points)
     hdb_labels = hdbscan.labels_
 
@@ -144,10 +107,10 @@ if __name__ == '__main__':
 
     #Kmeans using same number of clusters as hdbscan finds
     kmeans_hk = KMEANS(k=num_clusters)
-    kmeans_hk.plusplus_dc_kmeans(points=points, minPts=args.min_pts, max_iters=100)
+    kmeans_hk.plusplus_dc_kmeans(points=points, minPts=min_pts, max_iters=100)
     kmeans_labels_hk = kmeans_hk.labels
 
-    k = str(args.k)
+    k = str(k)
     hk = str(num_clusters)
 
     print("HDB K:", hk)
@@ -155,7 +118,7 @@ if __name__ == '__main__':
 
     ################################### RESULTS VISUALIZATION #####################################
     #Plot the complete graph from the dataset with the specified distance measure on all of the edges. Optionally show the distances in embedded space with MDS.
-    visualize(points=points, cluster_labels=kmeans_labels, minPts=args.min_pts, distance="dc_dist", centers=centers, save=save_visualization, save_name=image_save_name)
+    visualize(points=points, cluster_labels=kmeans_labels, minPts=min_pts, distance="dc_dist", centers=centers, save=save_visualization, save_name=image_save_name)
 
 
     #Plot the dc-tree, optionally with the centers from the final kmeans clusters marked in red

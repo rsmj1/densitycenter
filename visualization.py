@@ -28,7 +28,7 @@ def visualize_embedding(dists, names, distance, labels = None):
 
   plt.show()
 
-def visualize(points, cluster_labels = None, num_neighbors=None, embed = False, distance="dc_dist", minPts=3, show_cdists=False, centers=None, save=False, save_name=None):
+def visualize(points, cluster_labels = None, num_neighbors=None, embed = False, distance="dc_dist", minPts=3, centers=None, save=False, save_name=None):
   '''
   Visualizes the complete graph G over the points with chosen distances on the edges.
 
@@ -65,6 +65,36 @@ def visualize(points, cluster_labels = None, num_neighbors=None, embed = False, 
       The name to save the plot under.
   '''
 
+
+  cdist_entities = []
+  cdists_visible = False
+
+  def toggle_cdists(event):
+    nonlocal cdist_entities, cdists_visible
+    if not cdists_visible:
+       #Draw cdists
+       for i, pos in pos_dict.items():
+        circle = plt.Circle(pos, radius=cdists[i-1], edgecolor="black", facecolor="none", alpha=0.5)
+        ax.add_patch(circle)
+        cdist_entities.append(circle) #Save the circles to possibly destroy them
+
+        edge_pos = (pos[0], pos[1]+cdists[i-1])
+        line = ax.plot([pos[0], edge_pos[0]], [pos[1], edge_pos[1]], color='blue', zorder=0, alpha=0.5, linestyle='dotted')[0]
+        text = ax.text(pos[0], pos[1] + cdists[i-1]/2, str(np.round(cdists[i-1], 2)), ha='center', va='bottom', fontsize=6, color='black', rotation=90, bbox=None, zorder=1)
+        cdist_entities.append(line)
+        cdist_entities.append(text)
+
+        plt.draw()
+        cdists_visible = True
+    else:
+       #Destroy cdists
+       for c in cdist_entities:
+          c.remove()
+       cdist_entities = []
+       plt.draw()
+       cdists_visible = False
+
+  
   dists = get_dists(distance, points, minPts)
   
   fig, ax = plt.subplots(figsize=(16,9))
@@ -91,20 +121,12 @@ def visualize(points, cluster_labels = None, num_neighbors=None, embed = False, 
   if show_cdists:
      cdists = get_cdists(points, minPts)
 
-     for i, pos in pos_dict.items():
-        circle = plt.Circle(pos, radius=cdists[i-1], edgecolor="black", facecolor="none")
-        ax.add_patch(circle)
-
-        edge_pos = (pos[0], pos[1]+cdists[i-1])
-        ax.plot([pos[0], edge_pos[0]], [pos[1], edge_pos[1]], color='blue', zorder=0, alpha=0.5, linestyle='dotted')
-        ax.text(pos[0], pos[1] + cdists[i-1]/2, str(np.round(cdists[i-1], 2)), ha='center', va='bottom', fontsize=6, color='black', rotation=90, bbox=None, zorder=1)
-
+     
   #Code to highlight potential centers
   if centers is not None:
     print("highligthing centers")
     ax.scatter(centers[:, 0], centers[:,1], c="none", edgecolor="r", zorder=2, s=300)
      
-
   #Set perspective to be "real"
   ax.set_aspect('equal', adjustable='box')
   #This is needed to add axis values to the plot
@@ -120,6 +142,24 @@ def visualize(points, cluster_labels = None, num_neighbors=None, embed = False, 
         if save_name is None:
             save_name = str(datetime.now())
         plt.savefig("savefiles/images/"+save_name+"_graph.png")
+
+  # Get the position and size of the plot's axes
+  pos = ax.get_position()
+
+  # Set the position and size of the button relative to the plot's axes
+  button_width = 0.075
+  button_height = 0.05
+  button_spacing = 0.1
+  button_x = pos.x0 - button_spacing
+  button_y = pos.y0 + (pos.height - button_height) / 2 #This places it in the middle currently
+
+  # Create a button
+  button_ax = fig.add_axes([button_x, button_y, button_width, button_height]) #This defines the area on the plot that should be activated by the button widget
+  cdist_button = Button(button_ax, 'Toggle cdists')
+
+  # Attach the function to be called when the button is pressed
+  cdist_button.on_clicked(toggle_cdists)
+
 
   plt.show()
 
@@ -201,9 +241,9 @@ def print_numpy_code(array, newline=True):
       Will print each row on a separate line if true. Otherwise everything on a single line.
    '''
    if not newline:
-    print("np.array([", end="")
+    print("points = np.array([", end="")
    else:
-    print("np.array([")
+    print("points = np.array([")
    for j, row in enumerate(array):
       print("[", end="")
       for i, elem in enumerate(row):
@@ -235,7 +275,7 @@ def get_cdists(points, min_pts):
 
     cdists = np.sort(D, axis=1)
     cdists = cdists[:, min_pts - 1] #These are the core-distances for each point.
-    print("cdists:", cdists)
+    #print("cdists:", cdists)
     return cdists
 
 

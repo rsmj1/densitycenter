@@ -123,9 +123,7 @@ class KMEANS(object):
     '''     
     n = points.shape[0]
     dists = np.array([[dc_tree.dc_dist(c,p_index) for c in centers] for p_index in range(n)])
-    print("dists:", dists)
     cluster_dists = np.min(dists, axis=1)
-    print("cluster_dists:", cluster_dists)
     loss = np.sum(cluster_dists**2)
     
     return loss
