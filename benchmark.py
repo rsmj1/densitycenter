@@ -212,36 +212,40 @@ def benchmark(dataset_types, num_points, num_runs, runtypes, k, min_pts, eps, vi
     Parameters
     ----------
 
-    dataset_types : 
+    dataset_types : List: String 
 
-    num_points : 
 
-    num_runs : 
+    num_points : Int
 
-    runtypes : 
+    num_runs : Int
 
-    k : 
+    runtypes : List: String
 
-    min_pts : 
+    metrics : List: String, default=["nmi"]
 
-    eps : 
+    k : Int
 
-    visualize_results : 
+    min_pts : Int 
 
-    save_results : 
+    eps : Float
 
-    save_name : 
+    visualize_results : Boolean, default=False
 
-    plot_embeddings : 
+    save_results : Boolean, default=False
+
+    save_name : String, default="test"
+
+    plot_embeddings : Boolean, default=False
     '''
     num_runtypes = len(runtypes)
     num_datasets = len(dataset_types)
 
     datasets = np.zeros((num_datasets*num_runs, num_points)) #TODO: Currently does not support variable length datasets. Stores the actual datasets.
 
+    #If we want extra metrics should multiply depth by number of metrics. We want the layers for the same dataset across the metrics on top of each other.
     benchmark_results = np.zeros((num_runtypes+1, num_runtypes+1, num_datasets)) # Make square matrix with each layer being a separate dataset it has been run on. +1 for ground truth
     headers = np.empty((num_runtypes+1, num_datasets), dtype=str)
-    #TODO: Put the metric information in the headers as well.
+    #TODO: Put the metric information and number of runs averaged across in the headers as well.
     #TODO: add possibility to use plot_embedding that will pop up each time a set of runs has finished to visually compare clusterings.
 
     for d, dataset_type in enumerate(dataset_types):
@@ -249,7 +253,7 @@ def benchmark(dataset_types, num_points, num_runs, runtypes, k, min_pts, eps, vi
 
         for i in range(num_runs):
             curr_k = k #Reset k between each run
-            points, ground_truths = create_dataset(num_points, dataset_type)
+            points, ground_truths = create_dataset(num_points, dataset_type) #Move this outside num_runs if should be same across runs
             datasets[num_datasets*d + i,:] = points #Save the points generated for visualization later
             n = points.shape[0]
 
@@ -277,11 +281,11 @@ def benchmark(dataset_types, num_points, num_runs, runtypes, k, min_pts, eps, vi
                         headers[r, d] = runtype+"_"+"dbK"+"_"+used_min_pts+"_"+used_eps
 
             
-            #Do comparison between the different algorithms
+            #Do comparison between the different algorithms TODO: Should run this for each metric
             comparison_matrix[:,:,i] = metric_matrix(curr_labels)
             
         averaged_comparisons = np.mean(comparison_matrix, axis=2)
-        benchmark_results[d*num_datasets:(d+1)*num_datasets, d*num_datasets:(d+1)*num_datasets] = averaged_comparisons
+        benchmark_results[:,:,d] = averaged_comparisons #Insert the averaged values into the benchmark results
 
 
 
@@ -324,11 +328,15 @@ def print_results(results, row_headers, col_headers):
     return
 
 def metric_matrix(label_results):
+    '''
+    Creates a matrix of size num_labellings x num_labellings computing the NMI between each. 
+    '''
     n = label_results.shape[0]
     comparison_matrix = np.zeros((n,n))
     for i, labels1 in enumerate(label_results):
         for j, labels2 in enumerate(label_results):
-            comparison_matrix[i,j] = 0 #metric(labels1, labels2)         TODO insert metric here that compares sets of labels / clusters
+            comparison_matrix[i,j] = nmi(labels1, labels2)
+            #Currently should probably just be NMI: It is symmetric. 
     return comparison_matrix
 
 
