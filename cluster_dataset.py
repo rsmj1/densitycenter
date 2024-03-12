@@ -104,7 +104,8 @@ if __name__ == '__main__':
     hdb_labels = hdbscan.labels_
 
     num_clusters = len(np.unique(hdb_labels))
-
+    if np.isin(-1, hdb_labels) and num_clusters != 1: #Should not count noise labels as a set of labels
+                num_clusters -= 1
     #Kmeans using same number of clusters as hdbscan finds
     kmeans_hk = KMEANS(k=num_clusters)
     kmeans_hk.plusplus_dc_kmeans(points=points, minPts=min_pts, max_iters=100)

@@ -117,9 +117,7 @@ def visualize(points, cluster_labels = None, num_neighbors=None, embed = False, 
   nx.draw_networkx_edges(G, pos=pos_dict, ax=ax, width=0.8)
   nx.draw_networkx_edge_labels(G, pos=pos_dict, edge_labels=edge_labels, ax=ax, font_size=8)
 
-  #Code to show the core distances
-  if show_cdists:
-     cdists = get_cdists(points, minPts)
+
 
      
   #Code to highlight potential centers

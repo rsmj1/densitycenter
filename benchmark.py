@@ -20,13 +20,15 @@ from cluster_tree import dc_clustering
 from SpectralClustering import get_lambdas, get_sim_mx, run_spectral_clustering
 
 #My addons
-from kmeans import KMEANS
+from kmeans import DCKMeans
 from sklearn.cluster import HDBSCAN
 from sklearn.cluster import KMeans
 from point_gen import create_hierarchical_clusters
 from visualization import visualize, print_numpy_code
 from itertools import chain, combinations
 import efficientdcdist.dctree as dcdist
+import csv
+
 
 
 
@@ -94,7 +96,7 @@ def normalize_cluster_ordering(cluster_labels):
     Normalizes the clustering labels so that the first cluster label encountered is labelled 0, the next 1 and so on. 
     Preserves noise labelled as -1. Useful for clustering comparisons.
     '''
-    print("cluster_labels before:", cluster_labels)
+    #print("cluster_labels before:", cluster_labels)
     n = cluster_labels.shape[0]
     cluster_index = 0
     cluster_index_mapping = {}
@@ -115,9 +117,22 @@ def normalize_cluster_ordering(cluster_labels):
         else:
             norm_cluster_labels[i] = cluster_index_mapping[label]
 
-    print("cluster_labels after:", norm_cluster_labels)
+    #print("cluster_labels after:", norm_cluster_labels)
     return norm_cluster_labels
-####################################### END OF METHOD SETUPS ##############################################
+
+
+def equate_noise(noise_labels, noisee_labels):
+    '''
+    Makes the noise points in noise labels into noise points in noisee labels
+    '''
+    if noise_labels.shape[0] != noisee_labels.shape[0]:
+       raise AssertionError("The two sets of labels should have the same lengths...")
+
+    for i, noise in enumerate(noise_labels):
+        if noise == -1:
+            noisee_labels[i] = -1
+    return noisee_labels
+
 
 
 def brute_force_comparision(num_points, min_pts, max_iters=100):
@@ -146,7 +161,7 @@ def brute_force_comparision(num_points, min_pts, max_iters=100):
         hdb_labels = hdbscan.labels_
 
         k = len(np.unique(hdb_labels))
-        if np.isin(-1, hdb_labels) and k != 1:
+        if np.isin(-1, hdb_labels) and k != 1: #Should not count noise labels as a set of labels
             k -= 1
 
         indexes = np.arange(num_points)
@@ -157,10 +172,11 @@ def brute_force_comparision(num_points, min_pts, max_iters=100):
         #Make for loop here, checking all possible ways to choose k centers (their indexes) and their optimum.
         for c_c in combinations(indexes, k):
             cluster_combo = np.array(c_c)
-            print("combo:", cluster_combo)
+            #print("combo:", cluster_combo)
 
             curr_loss = kmeans.kmeans_loss(points, cluster_combo, dc_tree)
             if curr_loss < best_loss:
+                print("new best loss:", curr_loss, "with centers:", cluster_combo)
                 best_loss = curr_loss
                 best_centers = cluster_combo.copy()
         
@@ -168,9 +184,10 @@ def brute_force_comparision(num_points, min_pts, max_iters=100):
         kmeans_labels = kmeans.assign_points(points, best_centers, dc_tree)
         kmeans_labels_norm = normalize_cluster_ordering(kmeans_labels)
         hdb_labels_norm = normalize_cluster_ordering(hdb_labels)
+        #kmeans_labels_norm = equate_noise(hdb_labels_norm, kmeans_labels_norm)
         print("kmeans_labels_norm:", kmeans_labels_norm)
-        print("hdb_labels_norm", hdb_labels_norm)
-
+        print("hdb_labels_norm:   ", hdb_labels_norm)
+        #TODO Extract and understand issue instances.
         if not np.array_equal(kmeans_labels_norm, hdb_labels_norm):
             is_equal = False
             bad_dataset = points
@@ -184,8 +201,177 @@ def brute_force_comparision(num_points, min_pts, max_iters=100):
 
     return
 
+def benchmark(dataset_types, num_points, num_runs, runtypes, k, min_pts, eps, visualize_results=False, save_results=False, save_name="test", plot_embeddings = False):
+    '''
+    Runs a set of algorithms "runtypes" on a set of datasets "dataset_types" with "num_runs" iterations on each dataset. 
+    Within an iteration i of num_runs, will use the k (number of clusters) output from DBSCAN or HDBSCAN on algorithms that come after it.
+    Makes a comparison grid given a specified metric (TODO) between the set of labels averaging across the num_runs runs of all algorithms on a dataset. 
+    Therefore, the result is  (len(runtypes)+1) x (len(runtypes)+1) x len(dataset_types). 
+    Can output it to a CSV file, where the k, min_pts and eps values used for the run are appended to the algorithm name in the headers.
 
+    Parameters
+    ----------
+
+    dataset_types : 
+
+    num_points : 
+
+    num_runs : 
+
+    runtypes : 
+
+    k : 
+
+    min_pts : 
+
+    eps : 
+
+    visualize_results : 
+
+    save_results : 
+
+    save_name : 
+
+    plot_embeddings : 
+    '''
+    num_runtypes = len(runtypes)
+    num_datasets = len(dataset_types)
+
+    datasets = np.zeros((num_datasets*num_runs, num_points)) #TODO: Currently does not support variable length datasets. Stores the actual datasets.
+
+    benchmark_results = np.zeros((num_runtypes+1, num_runtypes+1, num_datasets)) # Make square matrix with each layer being a separate dataset it has been run on. +1 for ground truth
+    headers = np.empty((num_runtypes+1, num_datasets), dtype=str)
+    #TODO: Put the metric information in the headers as well.
+    #TODO: add possibility to use plot_embedding that will pop up each time a set of runs has finished to visually compare clusterings.
+
+    for d, dataset_type in enumerate(dataset_types):
+        comparison_matrix = np.zeros((num_runtypes, num_runtypes, num_runs))
+
+        for i in range(num_runs):
+            curr_k = k #Reset k between each run
+            points, ground_truths = create_dataset(num_points, dataset_type)
+            datasets[num_datasets*d + i,:] = points #Save the points generated for visualization later
+            n = points.shape[0]
+
+            headers[num_runtypes, d] = "Ground Truth k"+str(np.unique(ground_truths)) #Put ground truth as last element in square
+
+            curr_labels = np.zeros((num_runtypes+1, n))
+            curr_labels[num_runtypes] = ground_truths
+
+            after_hdb = False
+            for r, runtype in enumerate(runtypes):
+                if runtype == "HDBSCAN" or runtype == "DBSCAN":
+                    after_hdb = True #If algo run after HDB the K could be variable and should not be part of the header (if multiple runs)
+                print("Running", runtype, "on dataset \"", dataset_type + "\" with", num_points, "points")
+                labels, curr_k, used_min_pts, used_eps = benchmark_single(points, runtype, curr_k, min_pts, eps)
+                #Add the output labels to the collection of labels for this current dataset
+                curr_labels[r] = labels
+                if i == 0 and num_runs == 1:
+                    #Only 1 run, can always just put the k
+                    headers[r, d] = runtype+"_"+curr_k+"_"+used_min_pts+"_"+used_eps
+                elif i == 0:
+                    #Multiple runs, only put k if before DB or HDB as they alter the K
+                    if not after_hdb:
+                        headers[r, d] = runtype+"_"+curr_k+"_"+used_min_pts+"_"+used_eps
+                    else:
+                        headers[r, d] = runtype+"_"+"dbK"+"_"+used_min_pts+"_"+used_eps
+
+            
+            #Do comparison between the different algorithms
+            comparison_matrix[:,:,i] = metric_matrix(curr_labels)
+            
+        averaged_comparisons = np.mean(comparison_matrix, axis=2)
+        benchmark_results[d*num_datasets:(d+1)*num_datasets, d*num_datasets:(d+1)*num_datasets] = averaged_comparisons
+
+
+
+    if save_results:
+        results_to_csv(benchmark_results, dataset_types, runtypes, save_name)
     
+    display_results(benchmark_results, headers, dataset_types, datasets) #Should get as input the actual datasets to display the clusterings
+
+    print_results(benchmark_results, dataset_types, runtypes)
+    return
+
+def results_to_csv(results, headers, datasets, file_name):
+    with open("savefiles/benchmarks/"+file_name+".csv", "w", newline='') as res_file:
+        writer = csv.writer(res_file)
+
+        for i in range(results.shape[2]): #For each layer of the results
+            writer.writerow([datasets[i]]+list(headers[:,i])) #Write the column header of the current layer for the current dataset
+
+            for r, row in enumerate(results[:,:,i]): #For each of the rows in the current 2D layer
+                writer.writerow([headers[r,i]] + list(row))
+            writer.writerow([""]) #Empty row to separate results
+
+        #reshaped_results = results.transpose((0,2,1)).reshape(results.shape[0], -1) #Take all layers and put beside each other from left to right, leftmost being topmost
+
+    return
+
+
+def display_results(results, headers, dataset_types, datasets):
+    '''
+    Displays the comparative cluster metrics in heatmap grids
+    '''
+    return
+
+def print_results(results, row_headers, col_headers):
+    '''
+    Prints the benchmark data to the console for a quick glance.
+    '''
+
+
+    return
+
+def metric_matrix(label_results):
+    n = label_results.shape[0]
+    comparison_matrix = np.zeros((n,n))
+    for i, labels1 in enumerate(label_results):
+        for j, labels2 in enumerate(label_results):
+            comparison_matrix[i,j] = 0 #metric(labels1, labels2)         TODO insert metric here that compares sets of labels / clusters
+    return comparison_matrix
+
+
+def benchmark_single(points, runtype, k, min_pts, eps):
+    '''
+    Runs the provided runtype on points and returns the k used in the algorithm and the resulting labels.
+    '''
+    labels = None
+    used_min_pts = -1
+    used_eps = -1
+    if runtype == "HDBSCAN":
+        hdbscan = HDBSCAN(min_cluster_size=2, min_samples = min_pts)
+        hdbscan.fit(points)
+        labels = hdbscan.labels_
+        k = len(np.unique(labels))
+        if np.isin(-1, labels) and k != 1: #Should not count noise labels as a set of labels
+            k -= 1
+        used_min_pts = min_pts
+    elif runtype == "DBSCAN":
+        dbscan = DBSCAN(eps=eps, min_pts=min_pts)
+        dbscan.fit(points)
+        labels = dbscan.labels_
+        k = len(np.unique(labels))
+        if np.isin(-1, labels) and k != 1: #Should not count noise labels as a set of labels
+            k -= 1
+        used_min_pts = min_pts
+        used_eps = eps
+    elif runtype == "KMEANS":
+        kmeans = KMeans(n_clusters=k)
+        kmeans.fit(points)
+        labels = kmeans.labels_
+
+    elif runtype == "DCKMeans":
+        dckmeans = DCKMeans(k=k, min_pts=min_pts)
+        dckmeans.fit(points)
+        labels = dckmeans.labels_
+        used_min_pts = min_pts
+
+    elif runtype == "HUNGRYKMEANS":
+        print("TODO")
+
+    return labels, k, used_min_pts, used_eps
+
 
 if __name__ == "__main__":
     brute_force_comparision(num_points=10, min_pts=3)

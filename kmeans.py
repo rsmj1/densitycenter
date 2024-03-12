@@ -2,13 +2,32 @@ import efficientdcdist.dctree as dcdist
 import numpy as np
 
 
-class KMEANS(object):
+class DCKMeans(object):
 
-  def __init__(self, *, k):
+  def __init__(self, *, k, min_pts, method="plusplus", max_iters=100):
         self.k = k # The number of clusters that the given kmeans algorithm chosen will use
-        self.labels = None #the kmeans applied will put the cluster labels here
+        self.min_pts = min_pts
+        self.method = method # The methods are "naive", "plusplus", "hungry"
+        self.max_iters = max_iters # How many iterations of Lloyd's algorithm to maximally run 
+
+        self.labels_ = None #the kmeans applied will put the cluster labels here
         self.centers = None #The point values of the centers
         self.center_indexes = None #The point indexes in the point list of the centers
+
+
+  def fit(self, points):
+    
+    if self.method == "plusplus":
+      self.plusplus_dc_kmeans(points, self.min_pts)
+    elif self.method == "naive":
+      self.naive_dc_kmeans(points, self.min_pts)
+    elif self.method == "hungry":
+       print("TODO")
+
+    return
+
+
+
 
   def basic_dc_lloyds(self, points, dc_tree, cluster_center_indexes, max_iters=100):
     '''
@@ -49,7 +68,7 @@ class KMEANS(object):
     
     self.center_indexes = cluster_center_indexes
     self.centers = points[cluster_center_indexes]
-    self.labels = cluster_assignments
+    self.labels_ = cluster_assignments
     #print("Final assignments:", self.labels)
 
 
