@@ -166,7 +166,7 @@ def brute_force_comparision(num_points, min_pts, max_iters=100):
             k -= 1
 
         indexes = np.arange(num_points)
-        kmeans = KMEANS(k=k)
+        kmeans = DCKMeans(k=k)
         best_loss = np.inf
         best_centers = None
 
@@ -202,55 +202,65 @@ def brute_force_comparision(num_points, min_pts, max_iters=100):
 
     return
 
-def benchmark(dataset_types, num_points, num_runs, runtypes, k, min_pts, eps, visualize_results=False, save_results=False, save_name="test", plot_embeddings = False, metrics=["nmi"]):
+def benchmark(dataset_types, num_points, num_runs, runtypes, k, min_pts, eps, metrics=["nmi"],visualize_results=False, save_results=False, save_name="test", plot_embeddings = False):
     '''
     Runs a set of algorithms "runtypes" on a set of datasets "dataset_types" with "num_runs" iterations on each dataset. 
     Within an iteration i of num_runs, will use the k (number of clusters) output from DBSCAN or HDBSCAN on algorithms that come after it.
-    Makes a comparison grid given a specified metric (TODO) between the set of labels averaging across the num_runs runs of all algorithms on a dataset. 
-    Therefore, the result is  (len(runtypes)+1) x (len(runtypes)+1) x len(dataset_types). 
-    Can output it to a CSV file, where the k, min_pts and eps values used for the run are appended to the algorithm name in the headers.
+    Makes a comparison grid for each specified metric between the set of labels averaging across the num_runs runs of all algorithms on a dataset. 
+    Therefore, the result is  (len(runtypes)+1) x (len(runtypes)+1) x (len(dataset_types)*len(metrics)). 
+    Can output it to a CSV file, where the k, min_pts and eps values used for the run are appended to the algorithm name in the headers in that order. -1 means not applicable for that algorithm.
 
     Parameters
     ----------
 
     dataset_types : List: String 
-
+        The types of datasets to run the provided algorithms on.
 
     num_points : Int
+        The number of points to instantiate each type of dataset with
 
     num_runs : Int
-
+        The number of runs to perform on each dataset. The results over each run will be averaged. 
+    
     runtypes : List: String
-
+        The types of algorithms to run on the datasets. 
+    
     metrics : List: String, default=["nmi"]
-
+        The metrics to measure on each run on each dataset. 
+    
     k : Int
-
+        The number of clusters for algorithms that take this as a parameter. BEWARE: This will be altered AFTER using algorithms that find their own k.
+    
     min_pts : Int 
-
+        The number of points for something to be a core point for dc-dist.
+    
     eps : Float
-
+        The maximal distance for something to be in the neighborhood, for algorithms like DBSCAN.
+    
     visualize_results : Boolean, default=False
-
+        TODO
+    
     save_results : Boolean, default=False
-
+        Whether to save the results or not in a CSV-file. 
+    
     save_name : String, default="test"
-
+        The name under which to save the CSV-file.
+    
     plot_embeddings : Boolean, default=False
+        Whether to plot the clusterings for each dataset or not. TODO
     '''
     num_runtypes = len(runtypes)
     num_datasets = len(dataset_types)
     num_metrics = len(metrics)
 
-    datasets = []
+    datasets = [] #Save the datasets here for whatever they might otherwise be used for
 
     #If we want extra metrics should multiply depth by number of metrics. We want the layers for the same dataset across the metrics on top of each other.
     benchmark_results = np.zeros((num_runtypes+1, num_runtypes+1, num_datasets*num_metrics)) # Make square matrix with each layer being a separate dataset it has been run on. +1 for ground truth
     headers = np.empty((num_runtypes+1, num_datasets*num_metrics), dtype=np.dtype('U100'))
     rundata = []
-    #TODO: Put the metric information and number of runs averaged across in the headers as well.
     #TODO: add possibility to use plot_embedding that will pop up each time a set of runs has finished to visually compare clusterings.
-
+    #TODO: add control over seeding for reproducibility 
     for d, dataset_type in enumerate(dataset_types):
         comparison_matrix = np.zeros((num_runtypes+1, num_runtypes+1, num_runs, num_metrics)) #A num_runs layer 2d matrix for each metric
 
@@ -353,7 +363,7 @@ def metric_matrix(label_results, metric="nmi"):
 
 def benchmark_single(points, runtype, k, min_pts, eps):
     '''
-    Runs the provided runtype on points and returns the k used in the algorithm and the resulting labels.
+    Runs the provided runtype on points and returns the k, min_pts and eps used in the algorithm and the resulting labels.
     '''
     labels = None
     used_min_pts = -1
@@ -395,7 +405,7 @@ def benchmark_single(points, runtype, k, min_pts, eps):
 
 if __name__ == "__main__":
     #brute_force_comparision(num_points=10, min_pts=3)
-    benchmark(dataset_types=["moon", "gauss", "circle"], num_points=10, num_runs=3, runtypes=["KMEANS", "HDBSCAN", "DCKMEANS"], k=3, min_pts=3, eps=2, save_results=True, metrics=["nmi", "test"])
+    benchmark(dataset_types=["moon", "gauss", "circle"], num_points=10, num_runs=3, runtypes=["KMEANS", "HDBSCAN", "DCKMEANS"], metrics=["nmi", "test"], k=3, min_pts=3, eps=2, save_results=True)
 
 
 

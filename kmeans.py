@@ -148,6 +148,40 @@ class DCKMeans(object):
     
     return loss
 
+  def hungry_kmeans_loss(self, points, cluster_center_indexes, dc_tree):
+    '''
+    Computes the Hungry K-means loss, given k provided centers: 
+      Sum for each center of number of elements in the cluster times the largest distance from the center to a point in the cluster.
+    
+    Parameters
+    ----------
+
+    points : Numpy.array
+      The set of points over which the loss is computed.
+    
+    cluster_center_indexes : Numpy.array
+      The indexes into points of the chosen centers.
+    
+    dc_tree : DCTree
+      The dc-tree over the points.
+    '''     
+    n = points.shape[0]
+    k = cluster_center_indexes.shape[0]
+    #Compute the clusterings
+    dists = np.array([[dc_tree.dc_dist(c,p_index) for c in cluster_center_indexes] for p_index in range(n)])
+    cluster_assignments = np.argmin(dists, axis=1)
+
+    #Find the max value rho for each cluster
+    maxes = np.zeros(k)
+    for i in range(k):
+       maxes[i] = np.max(dists[cluster_assignments == i])
+    #Find the number of objects in each cluster
+    _, cluster_sizes = np.unique(cluster_assignments, return_counts=True)
+    #Compute the final loss
+    loss = np.sum([max_dist * size for max_dist, size in zip(maxes, cluster_sizes)])
+    return loss
+
+
   def assign_points(self, points, centers, dc_tree):
     n = points.shape[0]
     dists = np.array([[dc_tree.dc_dist(c,p_index) for c in centers] for p_index in range(n)])

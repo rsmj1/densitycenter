@@ -20,7 +20,7 @@ from cluster_tree import dc_clustering
 from SpectralClustering import get_lambdas, get_sim_mx, run_spectral_clustering
 
 #My addons
-from kmeans import KMEANS
+from kmeans import DCKMeans
 from sklearn.cluster import HDBSCAN
 from sklearn.cluster import KMeans
 from point_gen import create_hierarchical_clusters
@@ -81,7 +81,7 @@ if __name__ == '__main__':
 
 
     #K-means clustering
-    kmeans = KMEANS(k=k)
+    kmeans = DCKMeans(k=k)
     kmeans.plusplus_dc_kmeans(points=points, minPts=min_pts, max_iters=100)
 
     kmeans_labels = kmeans.labels
@@ -107,7 +107,7 @@ if __name__ == '__main__':
     if np.isin(-1, hdb_labels) and num_clusters != 1: #Should not count noise labels as a set of labels
                 num_clusters -= 1
     #Kmeans using same number of clusters as hdbscan finds
-    kmeans_hk = KMEANS(k=num_clusters)
+    kmeans_hk = DCKMeans(k=num_clusters)
     kmeans_hk.plusplus_dc_kmeans(points=points, minPts=min_pts, max_iters=100)
     kmeans_labels_hk = kmeans_hk.labels
 
