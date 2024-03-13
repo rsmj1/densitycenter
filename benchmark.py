@@ -28,7 +28,8 @@ from visualization import visualize, print_numpy_code
 from itertools import chain, combinations
 import efficientdcdist.dctree as dcdist
 import csv
-
+import warnings
+warnings.filterwarnings('ignore')
 
 
 
@@ -201,7 +202,7 @@ def brute_force_comparision(num_points, min_pts, max_iters=100):
 
     return
 
-def benchmark(dataset_types, num_points, num_runs, runtypes, k, min_pts, eps, visualize_results=False, save_results=False, save_name="test", plot_embeddings = False):
+def benchmark(dataset_types, num_points, num_runs, runtypes, k, min_pts, eps, visualize_results=False, save_results=False, save_name="test", plot_embeddings = False, metrics=["nmi"]):
     '''
     Runs a set of algorithms "runtypes" on a set of datasets "dataset_types" with "num_runs" iterations on each dataset. 
     Within an iteration i of num_runs, will use the k (number of clusters) output from DBSCAN or HDBSCAN on algorithms that come after it.
@@ -239,25 +240,25 @@ def benchmark(dataset_types, num_points, num_runs, runtypes, k, min_pts, eps, vi
     '''
     num_runtypes = len(runtypes)
     num_datasets = len(dataset_types)
+    num_metrics = len(metrics)
 
-    datasets = np.zeros((num_datasets*num_runs, num_points)) #TODO: Currently does not support variable length datasets. Stores the actual datasets.
+    datasets = []
 
     #If we want extra metrics should multiply depth by number of metrics. We want the layers for the same dataset across the metrics on top of each other.
-    benchmark_results = np.zeros((num_runtypes+1, num_runtypes+1, num_datasets)) # Make square matrix with each layer being a separate dataset it has been run on. +1 for ground truth
-    headers = np.empty((num_runtypes+1, num_datasets), dtype=str)
+    benchmark_results = np.zeros((num_runtypes+1, num_runtypes+1, num_datasets*num_metrics)) # Make square matrix with each layer being a separate dataset it has been run on. +1 for ground truth
+    headers = np.empty((num_runtypes+1, num_datasets*num_metrics), dtype=np.dtype('U100'))
+    rundata = []
     #TODO: Put the metric information and number of runs averaged across in the headers as well.
     #TODO: add possibility to use plot_embedding that will pop up each time a set of runs has finished to visually compare clusterings.
 
     for d, dataset_type in enumerate(dataset_types):
-        comparison_matrix = np.zeros((num_runtypes, num_runtypes, num_runs))
+        comparison_matrix = np.zeros((num_runtypes+1, num_runtypes+1, num_runs, num_metrics)) #A num_runs layer 2d matrix for each metric
 
         for i in range(num_runs):
             curr_k = k #Reset k between each run
             points, ground_truths = create_dataset(num_points, dataset_type) #Move this outside num_runs if should be same across runs
-            datasets[num_datasets*d + i,:] = points #Save the points generated for visualization later
+            datasets.append(points) #Save the points generated for visualization later
             n = points.shape[0]
-
-            headers[num_runtypes, d] = "Ground Truth k"+str(np.unique(ground_truths)) #Put ground truth as last element in square
 
             curr_labels = np.zeros((num_runtypes+1, n))
             curr_labels[num_runtypes] = ground_truths
@@ -266,43 +267,50 @@ def benchmark(dataset_types, num_points, num_runs, runtypes, k, min_pts, eps, vi
             for r, runtype in enumerate(runtypes):
                 if runtype == "HDBSCAN" or runtype == "DBSCAN":
                     after_hdb = True #If algo run after HDB the K could be variable and should not be part of the header (if multiple runs)
-                print("Running", runtype, "on dataset \"", dataset_type + "\" with", num_points, "points")
                 labels, curr_k, used_min_pts, used_eps = benchmark_single(points, runtype, curr_k, min_pts, eps)
                 #Add the output labels to the collection of labels for this current dataset
                 curr_labels[r] = labels
+                header = ""
                 if i == 0 and num_runs == 1:
                     #Only 1 run, can always just put the k
-                    headers[r, d] = runtype+"_"+curr_k+"_"+used_min_pts+"_"+used_eps
+                    header = runtype+"_"+str(curr_k)+"_"+str(used_min_pts)+"_"+str(used_eps)
                 elif i == 0:
                     #Multiple runs, only put k if before DB or HDB as they alter the K
                     if not after_hdb:
-                        headers[r, d] = runtype+"_"+curr_k+"_"+used_min_pts+"_"+used_eps
+                        header = runtype+"_"+str(curr_k)+"_"+str(used_min_pts)+"_"+str(used_eps)
                     else:
-                        headers[r, d] = runtype+"_"+"dbK"+"_"+used_min_pts+"_"+used_eps
+                        header = runtype+"_"+"dbK"+"_"+str(used_min_pts)+"_"+str(used_eps)
+                if i== 0:
+                    for m in range(num_metrics):
+                        headers[r, num_metrics*d+m] = header
+                        headers[num_runtypes, num_metrics*d+m] = "Ground Truth k"+str(len(np.unique(ground_truths))) #Put ground truth as last element in square
 
-            
+                
             #Do comparison between the different algorithms TODO: Should run this for each metric
-            comparison_matrix[:,:,i] = metric_matrix(curr_labels)
+            for m, metric in enumerate(metrics):          
+                comparison_matrix[:,:,i, m] = metric_matrix(curr_labels, metric)
             
-        averaged_comparisons = np.mean(comparison_matrix, axis=2)
-        benchmark_results[:,:,d] = averaged_comparisons #Insert the averaged values into the benchmark results
+        for m, metric in enumerate(metrics):
+            averaged_comparisons = np.mean(comparison_matrix[:,:,:,m], axis=2)
+            benchmark_results[:,:,d*num_metrics+m] = averaged_comparisons #Insert the averaged values into the benchmark results #TODO WRONG
+            #Create metadata header for each matrix
+            rundata.append("Dataset " + dataset_type + ", points: "+ str(num_points) + ", runs: "+ str(num_runs)+ ", metric: "+ metric)
 
-
-
+    print("headers:", headers)
     if save_results:
-        results_to_csv(benchmark_results, dataset_types, runtypes, save_name)
+        results_to_csv(benchmark_results, headers, rundata, save_name)
     
-    display_results(benchmark_results, headers, dataset_types, datasets) #Should get as input the actual datasets to display the clusterings
-
-    print_results(benchmark_results, dataset_types, runtypes)
+    display_results(benchmark_results, headers, rundata, datasets) #Should get as input the actual datasets to display the clusterings
+    print_results(benchmark_results, rundata, runtypes)
     return
 
-def results_to_csv(results, headers, datasets, file_name):
+def results_to_csv(results, headers, rundata, file_name):
     with open("savefiles/benchmarks/"+file_name+".csv", "w", newline='') as res_file:
-        writer = csv.writer(res_file)
+        writer = csv.writer(res_file, delimiter=";")
 
         for i in range(results.shape[2]): #For each layer of the results
-            writer.writerow([datasets[i]]+list(headers[:,i])) #Write the column header of the current layer for the current dataset
+            writer.writerow([rundata[i]])
+            writer.writerow([""]+list(headers[:,i])) #Write the column header of the current layer for the current dataset
 
             for r, row in enumerate(results[:,:,i]): #For each of the rows in the current 2D layer
                 writer.writerow([headers[r,i]] + list(row))
@@ -327,7 +335,7 @@ def print_results(results, row_headers, col_headers):
 
     return
 
-def metric_matrix(label_results):
+def metric_matrix(label_results, metric="nmi"):
     '''
     Creates a matrix of size num_labellings x num_labellings computing the NMI between each. 
     '''
@@ -335,7 +343,10 @@ def metric_matrix(label_results):
     comparison_matrix = np.zeros((n,n))
     for i, labels1 in enumerate(label_results):
         for j, labels2 in enumerate(label_results):
-            comparison_matrix[i,j] = nmi(labels1, labels2)
+            if metric == "nmi":
+                comparison_matrix[i,j] = nmi(labels1, labels2)
+            elif metric == "test":
+                comparison_matrix[i,j] = 100
             #Currently should probably just be NMI: It is symmetric. 
     return comparison_matrix
 
@@ -365,11 +376,11 @@ def benchmark_single(points, runtype, k, min_pts, eps):
         used_min_pts = min_pts
         used_eps = eps
     elif runtype == "KMEANS":
-        kmeans = KMeans(n_clusters=k)
+        kmeans = KMeans(n_clusters=k, n_init="auto")
         kmeans.fit(points)
         labels = kmeans.labels_
 
-    elif runtype == "DCKMeans":
+    elif runtype == "DCKMEANS":
         dckmeans = DCKMeans(k=k, min_pts=min_pts)
         dckmeans.fit(points)
         labels = dckmeans.labels_
@@ -377,12 +388,14 @@ def benchmark_single(points, runtype, k, min_pts, eps):
 
     elif runtype == "HUNGRYKMEANS":
         print("TODO")
-
+    else:
+        raise AssertionError("runtype", runtype, "does not exist...")
     return labels, k, used_min_pts, used_eps
 
 
 if __name__ == "__main__":
-    brute_force_comparision(num_points=10, min_pts=3)
+    #brute_force_comparision(num_points=10, min_pts=3)
+    benchmark(dataset_types=["moon", "gauss", "circle"], num_points=10, num_runs=3, runtypes=["KMEANS", "HDBSCAN", "DCKMEANS"], k=3, min_pts=3, eps=2, save_results=True, metrics=["nmi", "test"])
 
 
 

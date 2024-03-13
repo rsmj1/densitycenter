@@ -16,15 +16,16 @@ class DCKMeans(object):
 
 
   def fit(self, points):
-    
     if self.method == "plusplus":
+      #print("doing plusplus")
+      #print("labels are now:", self.labels_)
       self.plusplus_dc_kmeans(points, self.min_pts)
+      #print("labels after:", self.labels_)
     elif self.method == "naive":
       self.naive_dc_kmeans(points, self.min_pts)
     elif self.method == "hungry":
        print("TODO")
 
-    return
 
 
 
