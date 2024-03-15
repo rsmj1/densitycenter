@@ -33,6 +33,7 @@ def find_node_positions(root, width=1, vert_gap=0.2, vert_loc=0, xcenter=0.5, po
 
 def make_node_lists(root, point_labels, parent_count, dist_list, edge_list, color_list, alpha_list, edgecolor_list, dist_dict, centers=None):
     count = parent_count
+    print("id: ", root.point_id)
     if root.dist > 0:
         dist_list.append(root.dist)
     else: 
@@ -75,8 +76,8 @@ def make_node_lists(root, point_labels, parent_count, dist_list, edge_list, colo
 
 def plot_tree(root, labels, centers=None, save=False, save_name=None):
     '''
-    Plots the dc-dist tree, optionally highligthing nodes chosen as centers. Shows the node indexes on the leaves and dc-distances in the non-leaf nodes. The leaves are color-coded by the provided labels.
-    
+    Plots the dc-dist tree, optionally highligthing nodes chosen as centers with a red outline. Shows the node indexes on the leaves and dc-distances in the non-leaf nodes. The leaves are color-coded by the provided labels.
+    A yellow outline means that a node was labelled noise. 
     Parameters
     ----------
 

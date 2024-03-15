@@ -37,7 +37,7 @@ if __name__ == '__main__':
     n_neighbors = 15
     dataset_type = "moon" 
     save_dataset = False
-    load_dataset = True #If true will override the other params and just load from the filename.
+    load_dataset = False #If true will override the other params and just load from the filename.
     save_name = "simple4moon" #Shared for name of images, filename to save the dataset into
     load_name = "simple4moon"
 
@@ -81,10 +81,10 @@ if __name__ == '__main__':
 
 
     #K-means clustering
-    kmeans = DCKMeans(k=k)
+    kmeans = DCKMeans(k=k, min_pts=min_pts)
     kmeans.plusplus_dc_kmeans(points=points, minPts=min_pts, max_iters=100)
 
-    kmeans_labels = kmeans.labels
+    kmeans_labels = kmeans.labels_
     centers = kmeans.centers
 
 
@@ -107,9 +107,9 @@ if __name__ == '__main__':
     if np.isin(-1, hdb_labels) and num_clusters != 1: #Should not count noise labels as a set of labels
                 num_clusters -= 1
     #Kmeans using same number of clusters as hdbscan finds
-    kmeans_hk = DCKMeans(k=num_clusters)
+    kmeans_hk = DCKMeans(k=num_clusters, min_pts=min_pts)
     kmeans_hk.plusplus_dc_kmeans(points=points, minPts=min_pts, max_iters=100)
-    kmeans_labels_hk = kmeans_hk.labels
+    kmeans_labels_hk = kmeans_hk.labels_
 
     k = str(k)
     hk = str(num_clusters)
@@ -119,7 +119,7 @@ if __name__ == '__main__':
 
     ################################### RESULTS VISUALIZATION #####################################
     #Plot the complete graph from the dataset with the specified distance measure on all of the edges. Optionally show the distances in embedded space with MDS.
-    visualize(points=points, cluster_labels=kmeans_labels, minPts=min_pts, distance="dc_dist", centers=centers, save=save_visualization, save_name=image_save_name)
+    #visualize(points=points, cluster_labels=kmeans_labels, minPts=min_pts, distance="dc_dist", centers=centers, save=save_visualization, save_name=image_save_name)
 
 
     #Plot the dc-tree, optionally with the centers from the final kmeans clusters marked in red

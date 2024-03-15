@@ -124,3 +124,5 @@ def make_tree(points, labels, min_points=1, n_neighbors=15, make_image=False, po
 
     return root, dc_dists
 
+
+
