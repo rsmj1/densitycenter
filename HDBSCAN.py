@@ -109,42 +109,65 @@ class HDBSCAN(object):
             sum_{x in C}(1/emin(x,C) - 1/emax(C))
         , where emax(C) is the maximal epsilon at which the cluster exists, and emin(x,C) is the level at which a point no longer is part of the cluster and is considered noise.
 
+        The clusters are propagated bottom up as lists of lists. Each particle in this representation is determined by the size of min_cluster_size.
+        The cluster representation returned is ([cluster1,...,clusterk], stability_sum), where clusteri = [atom1,...,atomt], where atomj = (tree_pointer, tree_size, breakoff_dist).
+        Parent_dist is the maximal point at which the cluster exists.
         '''
         if dc_tree.is_leaf:
             #Leaf node
             if self.min_cluster_size > 1:
-                return [dc_tree.point_id], None#This point is considered noise
+                return [[(dc_tree, 1, cdists[dc_tree.id])]], 0#This point is considered noise
             else:
                 #To compute the stability of single-node cluster we need the dc_dist in its parent. 
-                return [dc_tree.point_id] ,(1/cdists[dc_tree.dist]) - (1/parent_dist) #This computes the stability of the 1-point cluster. 0 If the cdist is the same as the adjacent edge that was removed at the split.
+                #Min cluster size is be 2 here.
+                return [[(dc_tree, 1, parent_dist)]] , (1/cdists[dc_tree.id]) - (1/parent_dist) #This computes the stability of the 1-point cluster. 0 If the cdist is the same as the adjacent edge that was removed at the split.
 
         else:
             #Inner node
-            if self.min_cluster_size > self.get_tree_size(dc_tree):
-                return #This cluster is considered noise
+            tree_size = self.get_tree_size(dc_tree)
+            if self.min_cluster_size > tree_size:
+                return [[(dc_tree, tree_size, parent_dist)]], None #This cluster is considered noise when working with the given cluster_size
             else:
-                return
-            
+                left_clusters, left_stability = self.compute_clustering(dc_tree.left_tree, cdists, dc_tree.dist)
+                right_clusters, right_stability = self.compute_clustering(dc_tree.right_tree, cdists, dc_tree.dist)
+                total_stability = left_stability + right_stability 
+                all_clusters = left_clusters + right_clusters #append the clusters together
+                new_stability = self.cluster_stability(all_clusters, parent_dist, tree_size)
+                if new_stability > total_stability:
+                    #Make new cluster, by merging all: [cluster1, cluster2] -> [cluster1+cluster2]
+                    return [sum(all_clusters, [])], new_stability
+                else:
+                    return all_clusters, total_stability
 
 
 
-
-        return
-
-
-    def cluster_stability(self, dc_tree, cdists):
+    def cluster_stability(self, sub_clusters, parent_dist, tree_size):
         '''
         All internal nodes have an ID of none. 
         The dc_tree given here might be some sub-tree of the full "big" tree.
         
-        '''
+        TODO: When is a point considered noise? For now, I assume it is part of a noise-cluster. 
+        The stability of a cluster is given by: 
+
+            sum_{x in C}(1/emin(x,C) - 1/emax(C))
+        , where emax(C) is the maximal epsilon at which the cluster exists, and emin(x,C) is the level at which a point no longer is part of the cluster and is considered noise.
+
         
+        '''
+        #Emax is the parent distance, as this is the point at which this cluster branched from the parent
+        emax = 1/parent_dist
+        #Emin is the level at which each point became part of noise
+        eminsum = np.sum([self.sub_contribution(sub_cluster) for sub_cluster in sub_clusters])
 
-
-        return
+        
+        return eminsum - tree_size * emax
     
+    def sub_contribution(self, sub_cluster):
+        # Each sub_cluster element is represented as a tuple (tree_pointer, number of leaves, value for each leaf).
+        return [np.sum([1/(atom_size*atom_value) for _,atom_size,atom_value in sub_cluster])]
 
-    def get_tree_size(self, dc_tree, cdists):
+
+    def get_tree_size(self, dc_tree):
         '''
         Computes the size of the current tree (and by extension current cluster).
         This algorithm is linear in the number of leaves.
@@ -152,4 +175,14 @@ class HDBSCAN(object):
         if dc_tree.is_leaf:
             return 1
         else:
-            return self.get_tree_size(dc_tree.left_tree, cdists) + self.get_tree_size(dc_tree.right_tree, cdists)
+            return self.get_tree_size(dc_tree.left_tree) + self.get_tree_size(dc_tree.right_tree)
+        
+
+    def get_leaves(self, dc_tree):
+        '''
+        Returns the set of ids of the leaf nodes within the given cluster.
+        '''
+        if dc_tree.is_leaf:
+            return [dc_tree.id]
+        else:
+            return self.get_leaves(dc_tree.left_tree) + self.get_tree_size(dc_tree.right_tree)
