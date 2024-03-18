@@ -178,16 +178,21 @@ class HDBSCAN(object):
         
         '''
         #Emax is the parent distance, as this is the point at which this cluster branched from the parent
+        #print("tree_size:", tree_size)
+
         emax = 1/parent_dist
         #Emin is the level at which each point became part of noise
         eminsum = np.sum([self.sub_contribution(sub_cluster) for sub_cluster in sub_clusters])
         eminsum += np.sum([self.sub_contribution(sub_noise) for sub_noise in noise])
+
         
         return eminsum - tree_size * emax
     
     def sub_contribution(self, sub_cluster):
         # Each sub_cluster element is represented as a tuple (tree_pointer, number of leaves, value for each leaf).
-        return [np.sum([1/(atom_size*atom_value) for _,atom_size,atom_value in sub_cluster])]
+        #[print("subvalue:", 1/atom_value) for _, atom_size, atom_value in sub_cluster]
+        
+        return [np.sum([atom_size/atom_value for _,atom_size,atom_value in sub_cluster])]
 
 
     def get_tree_size(self, dc_tree):
@@ -208,7 +213,9 @@ class HDBSCAN(object):
         if dc_tree.is_leaf:
             return [dc_tree.point_id]
         else:
-            return self.get_leaves(dc_tree.left_tree) + self.get_tree_size(dc_tree.right_tree)
+            #print("left:", self.get_leaves(dc_tree.left_tree))
+            #print("right:", self.get_tree_size(dc_tree.right_tree))
+            return self.get_leaves(dc_tree.left_tree) + self.get_leaves(dc_tree.right_tree)
         
 
     def label_clusters(self, clustering, n):
