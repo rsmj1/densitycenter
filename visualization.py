@@ -65,7 +65,7 @@ def visualize(points, cluster_labels = None, num_neighbors=None, embed = False, 
       The name to save the plot under.
   '''
 
-
+  #TODO: Add cdists again
   cdist_entities = []
   cdists_visible = False
 
@@ -94,7 +94,7 @@ def visualize(points, cluster_labels = None, num_neighbors=None, embed = False, 
        plt.draw()
        cdists_visible = False
 
-  
+  cdists = get_cdists(points, minPts)
   dists = get_dists(distance, points, minPts)
   
   fig, ax = plt.subplots(figsize=(16,9))
