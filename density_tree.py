@@ -82,7 +82,7 @@ def _make_tree(all_dists, labels, point_ids, path=''):
     root = DensityTree(largest_dist)
     root.path = path
 
-    # TODO -- this will break if multiple copies of the same point. Need to first check for equal points
+    # TODO -- this will break if multiple copies of the same point. Need to first check for equal point
     if largest_dist == 0:
         root.label = labels[0]
         root.point_id = point_ids[0]
@@ -105,6 +105,7 @@ def _make_tree(all_dists, labels, point_ids, path=''):
     return root
 
 def make_tree(points, labels, min_points=1, n_neighbors=15, make_image=False, point_ids=None):
+    #TODO make labels optional...
     assert len(points.shape) == 2
     if len(np.unique(points, axis=0)) < len(points):
         raise ValueError('Currently not supported to have multiple duplicates of the same point in the dataset')
@@ -119,7 +120,7 @@ def make_tree(points, labels, min_points=1, n_neighbors=15, make_image=False, po
 
     root = _make_tree(dc_dists, labels, point_ids)
     #print("root:", root)
-    if make_image:
+    if make_image and labels is not None:
         plot_tree(root, labels)
 
     return root, dc_dists

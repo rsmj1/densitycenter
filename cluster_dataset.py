@@ -26,6 +26,7 @@ from sklearn.cluster import KMeans
 from point_gen import create_hierarchical_clusters
 from visualization import visualize
 from benchmark import create_dataset
+from HDBSCAN import HDBSCAN as newScan
 
 if __name__ == '__main__': 
     #################### RUN PARAMETERS HERE #######################
@@ -74,6 +75,11 @@ if __name__ == '__main__':
     n_neighbors=n_neighbors
     )
 
+    hdbscan_new = newScan(min_pts = min_pts, min_cluster_size=2)
+    hdbscan_new.fit(points)
+    print("labels:", hdbscan_new.labels_)
+    raise AssertionError("stop")
+
     #K-center
     pred_labels, kcenter_centers, epsilons = dc_clustering(root, num_points=len(labels), k=k, min_points=min_pts,)
 
@@ -99,6 +105,10 @@ if __name__ == '__main__':
     - metric: default = 'euclidean'
 
     '''
+    
+
+
+
     hdbscan = HDBSCAN(min_cluster_size=2, min_samples = min_pts)
     hdbscan.fit(points)
     hdb_labels = hdbscan.labels_

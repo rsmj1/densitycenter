@@ -4,7 +4,8 @@ import numba
 from density_tree import make_tree
 '''
 Current thoughts
-- Construction of the hierarchy: 
+- If I prune the tree I get issues while trying to compute tree sizes and so on...
+- You will always start with noise from the bottom, however, as you get a good stability the noise will be moved into clusters
 
 '''
 
@@ -20,6 +21,13 @@ class HDBSCAN(object):
     3. Bottom up recursion on the DCTree (technically the dendrogram) (potentially computing the stabilities bottom up as well while determining the best clusters)
     
     '''
+
+
+    #class SubCluster(object):
+
+    #    def __init__(self, clusters, noise, ):
+
+
 
 
     def __init__(self, *, min_pts, min_cluster_size=1):
@@ -59,6 +67,7 @@ class HDBSCAN(object):
         #print("cdists:", cdists)
         return cdists
 
+    @staticmethod
     @numba.njit(fastmath=True, parallel=True)
     def get_dist_matrix(points, D, dim, num_points):
         '''
@@ -87,17 +96,19 @@ class HDBSCAN(object):
 
     def fit(self, points):
         #Compute the core distances for each point
+        n = points.shape[0]
         cdists = self.get_cdists(points, self.min_pts)
-
+        placeholder = np.zeros(n)
         #Compute the dendrogram structure, which is equivalent to the dc_tree structure and contains the same information when combined with the core distances
-        dc_tree = make_tree(points, None, self.min_pts, )
+        dc_tree,_ = make_tree(points, placeholder, self.min_pts, )
 
-
+        #Compute the actual clustering
         clusterings = self.compute_clustering(dc_tree, cdists)
 
         #Create the labellings from the clusterings
+        labels = self.label_clusters(clusterings, n)
 
-        return
+        self.labels_ = labels
 
 
     def compute_clustering(self, dc_tree, cdists, parent_dist=None):
@@ -113,35 +124,47 @@ class HDBSCAN(object):
         The cluster representation returned is ([cluster1,...,clusterk], stability_sum), where clusteri = [atom1,...,atomt], where atomj = (tree_pointer, tree_size, breakoff_dist).
         Parent_dist is the maximal point at which the cluster exists.
         '''
+        #TODO: Fix None issues
         if dc_tree.is_leaf:
             #Leaf node
             if self.min_cluster_size > 1:
-                return [[(dc_tree, 1, cdists[dc_tree.id])]], 0#This point is considered noise
+                #Min cluster size is 2 here
+                return [], [[(dc_tree, 1, cdists[dc_tree.point_id])]], 0#This point is considered noise
             else:
                 #To compute the stability of single-node cluster we need the dc_dist in its parent. 
-                #Min cluster size is be 2 here.
-                return [[(dc_tree, 1, parent_dist)]] , (1/cdists[dc_tree.id]) - (1/parent_dist) #This computes the stability of the 1-point cluster. 0 If the cdist is the same as the adjacent edge that was removed at the split.
+                #Min cluster size is 1 here
+                return [[(dc_tree, 1, parent_dist)]], [], (1/cdists[dc_tree.point_id]) - (1/parent_dist) #This computes the stability of the 1-point cluster. 0 If the cdist is the same as the adjacent edge that was removed at the split.
 
         else:
             #Inner node
             tree_size = self.get_tree_size(dc_tree)
-            if self.min_cluster_size > tree_size:
-                return [[(dc_tree, tree_size, parent_dist)]], None #This cluster is considered noise when working with the given cluster_size
+            #print("tree_size, mcs:", tree_size, self.min_cluster_size)
+            if self.min_cluster_size >= tree_size:
+                return [], [[(dc_tree, tree_size, parent_dist)]], 0 #This cluster is considered noise when working with the given cluster_size
             else:
-                left_clusters, left_stability = self.compute_clustering(dc_tree.left_tree, cdists, dc_tree.dist)
-                right_clusters, right_stability = self.compute_clustering(dc_tree.right_tree, cdists, dc_tree.dist)
+                #print("going here...")
+                left_clusters, left_noise, left_stability = self.compute_clustering(dc_tree.left_tree, cdists, dc_tree.dist)
+                right_clusters, right_noise, right_stability = self.compute_clustering(dc_tree.right_tree, cdists, dc_tree.dist)
+
+
                 total_stability = left_stability + right_stability 
-                all_clusters = left_clusters + right_clusters #append the clusters together
-                new_stability = self.cluster_stability(all_clusters, parent_dist, tree_size)
-                if new_stability > total_stability:
-                    #Make new cluster, by merging all: [cluster1, cluster2] -> [cluster1+cluster2]
-                    return [sum(all_clusters, [])], new_stability
+                all_clusters = left_clusters + right_clusters #append the clusters together, as there is no noise in either branch
+                all_noise = left_noise + right_noise #append the noise as well
+                if parent_dist is None: #Root call has no parent_dist.
+                    return all_clusters
                 else:
-                    return all_clusters, total_stability
+                    new_stability = self.cluster_stability(all_clusters, all_noise, parent_dist, tree_size)
+                    print("below stability:", total_stability)
+                    print("new stability:", new_stability)
+                    if new_stability > total_stability:
+                        #Make new cluster, by merging all: [cluster1, cluster2] -> [cluster1+cluster2]
+                        return [sum(all_clusters+all_noise, [])],[], new_stability
+                    else:
+                        return all_clusters, all_noise, total_stability
 
 
 
-    def cluster_stability(self, sub_clusters, parent_dist, tree_size):
+    def cluster_stability(self, sub_clusters, noise, parent_dist, tree_size):
         '''
         All internal nodes have an ID of none. 
         The dc_tree given here might be some sub-tree of the full "big" tree.
@@ -158,7 +181,7 @@ class HDBSCAN(object):
         emax = 1/parent_dist
         #Emin is the level at which each point became part of noise
         eminsum = np.sum([self.sub_contribution(sub_cluster) for sub_cluster in sub_clusters])
-
+        eminsum += np.sum([self.sub_contribution(sub_noise) for sub_noise in noise])
         
         return eminsum - tree_size * emax
     
@@ -183,6 +206,22 @@ class HDBSCAN(object):
         Returns the set of ids of the leaf nodes within the given cluster.
         '''
         if dc_tree.is_leaf:
-            return [dc_tree.id]
+            return [dc_tree.point_id]
         else:
             return self.get_leaves(dc_tree.left_tree) + self.get_tree_size(dc_tree.right_tree)
+        
+
+    def label_clusters(self, clustering, n):
+        curr_label = 0
+        output_labels = np.zeros(n) -1
+        for cluster in clustering:
+            for atom_tree in cluster:
+                print("atom_tree:", atom_tree)
+                points = self.get_leaves(atom_tree[0])
+                for point in points:
+                    output_labels[point] = curr_label
+            curr_label += 1
+
+        return output_labels
+
+
