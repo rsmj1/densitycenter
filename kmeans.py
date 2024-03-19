@@ -63,7 +63,7 @@ class DCKMeans(object):
          #print("chose index:", cluster_center_indexes[c])
 
       if np.array_equal(cluster_center_indexes, old_center_indexes):
-        print("K is",self.k , "and stable point reached, stopping at iteration", i)
+        #print("K is",self.k , "and stable point reached, stopping at iteration", i)
         #print("Cluster center indexes:", cluster_center_indexes)
         break
     

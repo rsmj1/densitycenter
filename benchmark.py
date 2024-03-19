@@ -23,6 +23,8 @@ from SpectralClustering import get_lambdas, get_sim_mx, run_spectral_clustering
 from kmeans import DCKMeans
 from sklearn.cluster import HDBSCAN
 from sklearn.cluster import KMeans
+from HDBSCAN import HDBSCAN as newScan
+
 from point_gen import create_hierarchical_clusters
 from visualization import visualize, print_numpy_code
 from itertools import chain, combinations
@@ -371,6 +373,14 @@ def benchmark_single(points, runtype, k, min_pts, eps):
     if runtype == "HDBSCAN":
         hdbscan = HDBSCAN(min_cluster_size=2, min_samples = min_pts)
         hdbscan.fit(points)
+        labels = hdbscan.labels_
+        k = len(np.unique(labels))
+        if np.isin(-1, labels) and k != 1: #Should not count noise labels as a set of labels
+            k -= 1
+        used_min_pts = min_pts
+    elif runtype == "HDBSCAN_NEW":
+        hdbscan_new = newScan(min_samples = min_pts, min_cluster_size=2)
+        hdbscan_new.fit(points)
         labels = hdbscan.labels_
         k = len(np.unique(labels))
         if np.isin(-1, labels) and k != 1: #Should not count noise labels as a set of labels
