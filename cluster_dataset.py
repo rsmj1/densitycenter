@@ -31,7 +31,7 @@ from HDBSCAN import HDBSCAN as newScan
 if __name__ == '__main__': 
     #################### RUN PARAMETERS HERE #######################
 
-    num_points = 6
+    num_points = 12
     k = 2
     min_pts = 2
     plot_tree_bool = False
@@ -68,25 +68,25 @@ if __name__ == '__main__':
     #Create the dataset and old dc_tree setup for methods that need it as input
     points, labels = create_dataset(num_points=num_points, type=dataset_type, save=save_dataset, load=load_dataset, save_name=save_name, load_name=load_name)
     print(points.shape)
-    # points = np.array([[1,2],
-    #                    [1,4],
-    #                    [2,3],
-    #                    [1,1],
-    #                    [-5,15], #5
-    #                    [11,13],
-    #                    [13,11],
-    #                    [10,8],
-    #                    [14,13],
-    #                    [16,17], #10
-    #                    [18,19],
-    #                    [19,18]])
     points = np.array([[1,2],
-                       [2,1],
-                       [10,11],
-                       [11,10],
-                       [20,21], #5
-                       [21,20],
-                       ])
+                       [1,4],
+                       [2,3],
+                       [1,1],
+                       [-5,15], #5
+                       [11,13],
+                       [13,11],
+                       [10,8],
+                       [14,13],
+                       [16,17], #10
+                       [18,19],
+                       [19,18]])
+    # points = np.array([[1,2],
+    #                    [2,1],
+    #                    [10,11],
+    #                    [11,10],
+    #                    [20,21], #5
+    #                    [21,20],
+    #                    ])
     print(points.shape)
 
     
@@ -98,10 +98,10 @@ if __name__ == '__main__':
     n_neighbors=n_neighbors
     )
     
-    hdbscan_new = newScan(min_pts = min_pts, min_cluster_size=2)
-    hdbscan_new.fit(points)
-    print("labels:", hdbscan_new.labels_)
-    plot_tree(root, hdbscan_new.labels_, None, save=save_visualization, save_name=image_save_name)
+    #hdbscan_new = newScan(min_pts = min_pts, min_cluster_size=1)
+    #hdbscan_new.fit(points)
+    #print("labels:", hdbscan_new.labels_)
+    plot_tree(root, labels, None, save=save_visualization, save_name=image_save_name)
     visualize(points=points, cluster_labels=hdbscan_new.labels_, minPts=min_pts, distance="dc_dist", centers=None, save=save_visualization, save_name=image_save_name)
 
 

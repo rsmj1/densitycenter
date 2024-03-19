@@ -3,12 +3,9 @@ import numpy as np
 import numba
 from density_tree import make_tree
 '''
-Current thoughts
-- If I prune the tree I get issues while trying to compute tree sizes and so on...
-- You will always start with noise from the bottom, however, as you get a good stability the noise will be moved into clusters
-- New cluster starts either when enough points gathered to be above threshold and none of below are clusters or when two below clusters end
-- Cluster ends when merged with another big enough cluster
-- All noise points that fall out of the cluster: It does not matter when it does, however, note that 
+Thoughts about HDBSCAN:
+
+It has a funky way of letting quite noisy points be part of a cluster
 '''
 
 
@@ -20,15 +17,10 @@ class HDBSCAN(object):
     The steps:
     1. Compute the Core Distances of all the points
     2. Compute the DCTree
-    3. Bottom up recursion on the DCTree (technically the dendrogram) (potentially computing the stabilities bottom up as well while determining the best clusters)
+    3. Bottom up recursion on the DCTree, computing the stability in each node.
+
     
     '''
-
-
-    #class SubCluster(object):
-
-    #    def __init__(self, clusters, noise, ):
-
 
 
 
@@ -147,6 +139,8 @@ class HDBSCAN(object):
                 return [], 0 #This cluster is considered noise when working with the given cluster_size
             else:
                 #Propagate down the last change in cdist since all points connected in the tree with same value correspond to one big split at one level below that parent dist that gets propagated.
+                #TODO: We can reduce computation time by only computing a new stability when: We are at the top of a multi-split of same dc-distance. When we are below another cluster merge. 
+                #We do not explicitly need propagation information as the value inevitably is the same or higher at the top of the split anyways, so we cannot get the below clusters as real clusters anyways.
                 recursion_dist_left = dc_tree.dist
                 recursion_dist_right = dc_tree.dist
                 propagate_left, propagate_right = False, False
@@ -159,30 +153,34 @@ class HDBSCAN(object):
                 left_clusters, left_stability = self.compute_clustering(dc_tree.left_tree, cdists, recursion_dist_left, propagate_left)
                 right_clusters, right_stability = self.compute_clustering(dc_tree.right_tree, cdists, recursion_dist_right, propagate_right)
 
-
-                if parent_dist is None: #Root call has no parent_dist.
-                    return left_clusters + right_clusters
+                if is_propagated:
+                    #If this is part of a non-binary split and is currently below nodes of this split, we do not need to compute the stability here, and can just propagate up again.
+                    return left_clusters + right_clusters, left_stability+right_stability
                 else:
-                    #Not the root node
+                    #This is not a propagated value
+                    if parent_dist is None: #Root call has no parent_dist.
+                        return left_clusters + right_clusters
+                    else:
+                        #Not the root node
 
-                    total_stability = left_stability + right_stability 
-                    all_clusters = left_clusters + right_clusters #append the clusters together, as there is no noise in either branch
-                    new_stability = self.cluster_stability(dc_tree, parent_dist, tree_size)
-                    
-                    
-                    print("nodes: ", np.array(self.get_leaves(dc_tree))+1)
-                    print("old below sum stability:", total_stability)
-                    print("left, right:", left_stability, right_stability)
-                    print("parent_dist:", parent_dist)
-                    print("new stability:", new_stability)
-                    
-                    if new_stability >= total_stability: #Should be bigger than or equal to encompass that we get all the noise points added every time.
-                        #print("old below sum stability:", total_stability)
-                        #print("new stability:", new_stability)
-                        #Make new cluster, by merging all: [cluster1, cluster2] -> [cluster1+cluster2]
-                        return [dc_tree], new_stability
-                    else:                        
-                        return all_clusters, total_stability
+                        total_stability = left_stability + right_stability 
+                        all_clusters = left_clusters + right_clusters #append the clusters together, as there is no noise in either branch
+                        new_stability = self.cluster_stability(dc_tree, parent_dist, tree_size)
+                        
+                        
+                        print("nodes: ", np.array(self.get_leaves(dc_tree))+1)
+                        print("old below sum stability:", total_stability)
+                        print("left, right:", left_stability, right_stability)
+                        print("parent_dist:", parent_dist)
+                        print("new stability:", new_stability)
+                        
+                        if new_stability >= total_stability: #Should be bigger than or equal to encompass that we get all the noise points added every time.
+                            #print("old below sum stability:", total_stability)
+                            #print("new stability:", new_stability)
+                            #Make new cluster, by merging all: [cluster1, cluster2] -> [cluster1+cluster2]
+                            return [dc_tree], new_stability
+                        else:                        
+                            return all_clusters, total_stability
 
 
 
