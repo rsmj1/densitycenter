@@ -149,22 +149,33 @@ class HDBSCAN(object):
                 #Propagate down the last change in cdist since all points connected in the tree with same value correspond to one big split at one level below that parent dist that gets propagated.
                 recursion_dist_left = dc_tree.dist
                 recursion_dist_right = dc_tree.dist
+                propagate_left, propagate_right = False, False
                 if dc_tree.left_tree.dist == dc_tree.dist:
                     recursion_dist_left = parent_dist
+                    propagate_left = True
                 if dc_tree.right_tree.dist == dc_tree.dist:
                     recursion_dist_right = parent_dist
-                left_clusters, left_noise, left_stability = self.compute_clustering(dc_tree.left_tree, cdists, recursion_dist_left)
-                right_clusters, right_noise, right_stability = self.compute_clustering(dc_tree.right_tree, cdists, recursion_dist_right)
+                    propagate_right = True
+                left_clusters, left_noise, left_stability = self.compute_clustering(dc_tree.left_tree, cdists, recursion_dist_left, propagate_left)
+                right_clusters, right_noise, right_stability = self.compute_clustering(dc_tree.right_tree, cdists, recursion_dist_right, propagate_right)
 
 
                 if parent_dist is None: #Root call has no parent_dist.
                     return left_clusters + right_clusters
                 else:
-                    if left_stability == 0 or right_stability == 0: #Even if both are, we will always have that the sum of the sizes of the two sub-parts will be higher than min_cluster size due to how the recursion works and where it stops.
+                    #Not the root node
+
+                    if is_propagated: #Even if both are, we will always have that the sum of the sizes of the two sub-parts will be higher than min_cluster size due to how the recursion works and where it stops.
+                        #If it is propagated and merges two real clusters, propagate these new clusters up, but do not update the levels at which the noise falls off, as the points above will need these same calculations
+                        #If it does not merge two clusters then still don't update the levels at which noise falls off other than this particular noise point at this level.
                         print("TODO")
                         #We need to treat all points with the same cdists that are connected as single point on the way up as well...
-                    if is_propagated:
+                        #Also we need to propagate up the fact that two clusters have been merged, since we need to know evne if the last part of the merging is with noise that we need to update distances.
+                    else:
                         print("TODO")
+                        #If noise then do not update the levels at which points fall off.
+                        #If not noise then update the levels
+
 
                     total_stability = left_stability + right_stability 
                     all_clusters = left_clusters + right_clusters #append the clusters together, as there is no noise in either branch
