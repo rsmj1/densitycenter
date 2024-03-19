@@ -132,11 +132,11 @@ class HDBSCAN(object):
             #Leaf node
             if self.min_cluster_size > 1:
                 #Min cluster size is 2 here
-                return [], [[(dc_tree, 1, parent_dist)]], 0#This point is considered noise and fell out of the current cluster at this height
+                return [], 0#This point is considered noise and fell out of the current cluster at this height
             else:
                 #To compute the stability of single-node cluster we need the dc_dist in its parent. 
                 #Min cluster size is 1 here
-                return [[(dc_tree, 1, parent_dist)]], [], (1/cdists[dc_tree.point_id]) - (1/parent_dist) #This computes the stability of the 1-point cluster. 0 If the cdist is the same as the adjacent edge that was removed at the split.
+                return [dc_tree], (1/cdists[dc_tree.point_id]) - (1/parent_dist) #This computes the stability of the 1-point cluster. 0 If the cdist is the same as the adjacent edge that was removed at the split.
 
         else:
             #Inner node
@@ -144,7 +144,7 @@ class HDBSCAN(object):
             #print("tree_size, mcs:", tree_size, self.min_cluster_size)
             if self.min_cluster_size > tree_size:
                 #print("returning current nodes: ", self.get_leaves(dc_tree))
-                return [], [[(dc_tree, tree_size, parent_dist)]], 0 #This cluster is considered noise when working with the given cluster_size
+                return [], 0 #This cluster is considered noise when working with the given cluster_size
             else:
                 #Propagate down the last change in cdist since all points connected in the tree with same value correspond to one big split at one level below that parent dist that gets propagated.
                 recursion_dist_left = dc_tree.dist
@@ -156,8 +156,8 @@ class HDBSCAN(object):
                 if dc_tree.right_tree.dist == dc_tree.dist:
                     recursion_dist_right = parent_dist
                     propagate_right = True
-                left_clusters, left_noise, left_stability = self.compute_clustering(dc_tree.left_tree, cdists, recursion_dist_left, propagate_left)
-                right_clusters, right_noise, right_stability = self.compute_clustering(dc_tree.right_tree, cdists, recursion_dist_right, propagate_right)
+                left_clusters, left_stability = self.compute_clustering(dc_tree.left_tree, cdists, recursion_dist_left, propagate_left)
+                right_clusters, right_stability = self.compute_clustering(dc_tree.right_tree, cdists, recursion_dist_right, propagate_right)
 
 
                 if parent_dist is None: #Root call has no parent_dist.
@@ -165,46 +165,33 @@ class HDBSCAN(object):
                 else:
                     #Not the root node
 
-                    if is_propagated: #Even if both are, we will always have that the sum of the sizes of the two sub-parts will be higher than min_cluster size due to how the recursion works and where it stops.
-                        #If it is propagated and merges two real clusters, propagate these new clusters up, but do not update the levels at which the noise falls off, as the points above will need these same calculations
-                        #If it does not merge two clusters then still don't update the levels at which noise falls off other than this particular noise point at this level.
-                        print("TODO")
-                        #We need to treat all points with the same cdists that are connected as single point on the way up as well...
-                        #Also we need to propagate up the fact that two clusters have been merged, since we need to know evne if the last part of the merging is with noise that we need to update distances.
-                    else:
-                        print("TODO")
-                        #If noise then do not update the levels at which points fall off.
-                        #If not noise then update the levels
-
-
                     total_stability = left_stability + right_stability 
                     all_clusters = left_clusters + right_clusters #append the clusters together, as there is no noise in either branch
-                    all_noise = left_noise + right_noise #append the noise as well
-                    new_stability = self.cluster_stability(all_clusters, all_noise, parent_dist, tree_size)
+                    new_stability = self.cluster_stability(dc_tree, parent_dist, tree_size)
+                    
+                    
                     print("nodes: ", np.array(self.get_leaves(dc_tree))+1)
                     print("old below sum stability:", total_stability)
-                    print("left:", left_stability)
-                    print("right:", right_stability)
+                    print("left, right:", left_stability, right_stability)
+                    print("parent_dist:", parent_dist)
                     print("new stability:", new_stability)
                     
                     if new_stability >= total_stability: #Should be bigger than or equal to encompass that we get all the noise points added every time.
                         #print("old below sum stability:", total_stability)
                         #print("new stability:", new_stability)
                         #Make new cluster, by merging all: [cluster1, cluster2] -> [cluster1+cluster2]
-                        return [sum(all_clusters+all_noise, [])],[], new_stability
-                    else:
-                        print("NOT BIGGER")
-                        
-                        return all_clusters, all_noise, total_stability
+                        return [dc_tree], new_stability
+                    else:                        
+                        return all_clusters, total_stability
 
 
 
-    def cluster_stability(self, sub_clusters, noise, parent_dist, tree_size):
+    def cluster_stability(self, dc_tree, parent_dist, tree_size):
         '''
         All internal nodes have an ID of none. 
         The dc_tree given here might be some sub-tree of the full "big" tree.
         
-        TODO: When is a point considered noise? For now, I assume it is part of a noise-cluster. 
+        A point falls out of a cluster when new ones start existing that they become part of or when they become noise, whichever comes first top down.
         The stability of a cluster is given by: 
 
             sum_{x in C}(1/emin(x,C) - 1/emax(C))
@@ -212,22 +199,36 @@ class HDBSCAN(object):
 
         
         '''
-        #Emax is the parent distance, as this is the point at which this cluster branched from the parent
-        #print("tree_size:", tree_size)
-
-        emax = 1/parent_dist
+        emax = tree_size/parent_dist
         #Emin is the level at which each point became part of noise
-        eminsum = np.sum([self.sub_contribution(sub_cluster) for sub_cluster in sub_clusters])
-        eminsum += np.sum([self.sub_contribution(sub_noise) for sub_noise in noise])
+        #Recurse and at each level if one side is noise return that value, for the other side continue recursing.
+        #Stop the recursion when two clusters merge and return that level value for all nodes below. 
+        #print("Calling sub_contribution on nodes:", self.get_leaves(dc_tree))
+        eminsum = self.sub_contribution(dc_tree)
 
-        
-        return eminsum - tree_size * emax
+        return eminsum - emax
     
-    def sub_contribution(self, sub_cluster):
-        # Each sub_cluster element is represented as a tuple (tree_pointer, number of leaves, value for each leaf).
-        #[print("subvalue:", 1/atom_value) for _, atom_size, atom_value in sub_cluster]
-        
-        return [np.sum([atom_size/atom_value for _,atom_size,atom_value in sub_cluster])]
+    def sub_contribution(self, dc_tree):
+        # This is never called on a leaf / noise. The recursion checks into the children and stops before that call happens. And it also doesn't happen from the call in compute_clustering.
+        left_size = self.get_tree_size(dc_tree.left_tree)
+        right_size = self.get_tree_size(dc_tree.right_tree)
+        #print("left, right size:", left_size, right_size)
+        if left_size < self.min_cluster_size and right_size < self.min_cluster_size:
+            #Both sides noise
+            #print("both are noise!")
+            #print("dc_tree.dist:")
+            return (left_size + right_size) * (1/dc_tree.dist)
+        elif left_size < self.min_cluster_size:
+            #LHS noise
+            return left_size * (1/dc_tree.dist) + self.sub_contribution(dc_tree.right_tree)
+        elif right_size < self.min_cluster_size:
+            #RHS noise
+            return right_size * (1/dc_tree.dist) + self.sub_contribution(dc_tree.left_tree)
+        else:
+            #Cluster merging
+            return (left_size+right_size) * (1/dc_tree.dist)
+
+
 
 
     def get_tree_size(self, dc_tree):
@@ -257,11 +258,9 @@ class HDBSCAN(object):
         curr_label = 0
         output_labels = np.zeros(n) -1
         for cluster in clustering:
-            for atom_tree in cluster:
-                #print("atom_tree:", atom_tree)
-                points = self.get_leaves(atom_tree[0])
-                for point in points:
-                    output_labels[point] = curr_label
+            points = self.get_leaves(cluster)
+            for point in points:
+                output_labels[point] = curr_label
             curr_label += 1
 
         return output_labels

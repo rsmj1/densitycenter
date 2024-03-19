@@ -31,7 +31,7 @@ from HDBSCAN import HDBSCAN as newScan
 if __name__ == '__main__': 
     #################### RUN PARAMETERS HERE #######################
 
-    num_points = 12
+    num_points = 6
     k = 2
     min_pts = 2
     plot_tree_bool = False
@@ -101,9 +101,9 @@ if __name__ == '__main__':
     hdbscan_new = newScan(min_pts = min_pts, min_cluster_size=2)
     hdbscan_new.fit(points)
     print("labels:", hdbscan_new.labels_)
+    plot_tree(root, hdbscan_new.labels_, None, save=save_visualization, save_name=image_save_name)
     visualize(points=points, cluster_labels=hdbscan_new.labels_, minPts=min_pts, distance="dc_dist", centers=None, save=save_visualization, save_name=image_save_name)
 
-    plot_tree(root, hdbscan_new.labels_, None, save=save_visualization, save_name=image_save_name)
 
     raise AssertionError("stop")
     #K-center
