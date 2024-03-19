@@ -124,7 +124,7 @@ if __name__ == '__main__':
     '''
     mcs = 4
 
-    hdbscan_new = newScan(min_pts = min_pts, min_cluster_size=mcs)
+    hdbscan_new = newScan(min_pts = min_pts, min_cluster_size=1)
     hdbscan_new.fit(points)
     hdb_new_labels = hdbscan_new.labels_
     num_clusters_new = len(np.unique(hdb_new_labels))

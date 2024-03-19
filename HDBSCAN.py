@@ -122,7 +122,12 @@ class HDBSCAN(object):
                 return [], 0#This point is considered noise and fell out of the current cluster at this height
             else:
                 #Min cluster size is 1 here. To compute the stability of single-node cluster we need the dc_dist in its parent. 
-                return [dc_tree], (1/cdists[dc_tree.point_id]) - (1/parent_dist) #This computes the stability of the 1-point cluster. 0 If the cdist is the same as the adjacent edge that was removed at the split.
+                #TODO: If the difference is 0, then return point as noise. 
+                stability = (1/cdists[dc_tree.point_id]) - (1/parent_dist)
+                if stability > 0:
+                    return [dc_tree], stability #This computes the stability of the 1-point cluster. 0 If the cdist is the same as the adjacent edge that was removed at the split.
+                else:
+                    return [], 0
         else:
             tree_size = self.get_tree_size(dc_tree)
             if self.min_cluster_size > tree_size:
@@ -178,7 +183,7 @@ class HDBSCAN(object):
         if self.min_cluster_size > 1:
             eminsum = self.sub_contribution(dc_tree)
         else:
-            eminsum = self.sub_contribution_1(dc_tree, cdists)
+            eminsum = self.sub_contribution_1_1(dc_tree, cdists)
         return eminsum - emax
     
     def sub_contribution(self, dc_tree):
@@ -203,7 +208,7 @@ class HDBSCAN(object):
             return (left_size+right_size) * (1/dc_tree.dist)
 
 
-    def sub_contribution_1(self, dc_tree, cdists):
+    def sub_contribution_1(self, dc_tree, cdists): #Version with no noise points. If activating this, also remember to change the leaf case in compute_clustering to always return the point as a cluster even is stability is 0.
         '''
         For min_cluster_size = 1. 
         Given a cluster C, this computes: sum_{x in C} 1 / emin(x,C).
@@ -225,6 +230,37 @@ class HDBSCAN(object):
             #Cluster merging
             return (left_size+right_size) * (1/dc_tree.dist)
 
+    def sub_contribution_1_1(self, dc_tree, cdists): #Version with noise points.
+            '''
+            For min_cluster_size = 1. 
+            Given a cluster C, this computes: sum_{x in C} 1 / emin(x,C).
+            This is never called on a leaf / noise.
+            This version should be consistent with the theory. 
+            '''
+
+            left_size = self.get_tree_size(dc_tree.left_tree)
+            right_size = self.get_tree_size(dc_tree.right_tree)
+            if left_size == self.min_cluster_size and right_size == self.min_cluster_size:
+                #Both sides noise
+                return (1/cdists[dc_tree.left_tree.point_id]) + (1/cdists[dc_tree.right_tree.point_id])
+            
+            elif left_size == self.min_cluster_size:
+                #LHS potential noise
+                if cdists[dc_tree.left_tree.point_id] != dc_tree.dist:
+                    return (1/cdists[dc_tree.left_tree.point_id]) + right_size * (1/dc_tree.right_tree.dist)
+                else:                                                   #Not a true split, still noise downwards
+                    return (1/cdists[dc_tree.left_tree.point_id]) + self.sub_contribution_1_1(dc_tree.right_tree, cdists)
+                
+            elif right_size == self.min_cluster_size:
+                #RHS potential noise
+                if cdists[dc_tree.right_tree.point_id] != dc_tree.dist:
+                    return (1/cdists[dc_tree.right_tree.point_id]) + left_size * (1/dc_tree.left_tree.dist)
+                else:
+                    return (1/cdists[dc_tree.right_tree.point_id]) + self.sub_contribution_1_1(dc_tree.left_tree, cdists)
+                
+            else:
+                #Cluster merging
+                return (left_size+right_size) * (1/dc_tree.dist)
 
     def get_tree_size(self, dc_tree):
         '''
