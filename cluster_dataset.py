@@ -8,6 +8,7 @@ from sklearn.metrics import normalized_mutual_info_score as nmi
 from sklearn.decomposition import PCA
 import networkx as nx
 from datetime import datetime
+import time
 #import hdbscan
 
 from experiment_utils.get_data import get_dataset, make_circles
@@ -27,11 +28,12 @@ from point_gen import create_hierarchical_clusters
 from visualization import visualize
 from benchmark import create_dataset
 from HDBSCAN import HDBSCAN as newScan
+from benchmark import normalize_cluster_ordering
 
 if __name__ == '__main__': 
     #################### RUN PARAMETERS HERE #######################
 
-    num_points = 100
+    num_points = 12
     k = 2
     min_pts = 2
     plot_tree_bool = False
@@ -67,18 +69,18 @@ if __name__ == '__main__':
 
     #Create the dataset and old dc_tree setup for methods that need it as input
     points, labels = create_dataset(num_points=num_points, type=dataset_type, save=save_dataset, load=load_dataset, save_name=save_name, load_name=load_name)
-    # points = np.array([[1,2],
-    #                    [1,4],
-    #                    [2,3],
-    #                    [1,1],
-    #                    [-5,15], #5
-    #                    [11,13],
-    #                    [13,11],
-    #                    [10,8],
-    #                    [14,13],
-    #                    [16,17], #10
-    #                    [18,19],
-    #                    [19,18]])
+    points = np.array([[1,2],
+                       [1,4],
+                       [2,3],
+                       [1,1],
+                       [-5,15], #5
+                       [11,13],
+                       [13,11],
+                       [10,8],
+                       [14,13],
+                       [16,17], #10
+                       [18,19],
+                       [19,18]])
     # points = np.array([[1,2],
     #                    [2,1],
     #                    [10,11],
@@ -86,7 +88,6 @@ if __name__ == '__main__':
     #                    [20,21], #5
     #                    [21,20],
     #                    ])
-
     root, dc_dists = make_tree(
     points,
     labels,
@@ -94,8 +95,7 @@ if __name__ == '__main__':
     make_image=plot_tree_bool,
     n_neighbors=n_neighbors
     )
-    
-    
+
     
     #K-center
     pred_labels, kcenter_centers, epsilons = dc_clustering(root, num_points=len(labels), k=k, min_points=min_pts,)
@@ -122,17 +122,20 @@ if __name__ == '__main__':
     - metric: default = 'euclidean'
 
     '''
-    
+    mcs = 4
 
-    hdbscan_new = newScan(min_pts = min_pts, min_cluster_size=2)
+    hdbscan_new = newScan(min_pts = min_pts, min_cluster_size=mcs)
     hdbscan_new.fit(points)
     hdb_new_labels = hdbscan_new.labels_
     num_clusters_new = len(np.unique(hdb_new_labels))
     if np.isin(-1, hdb_new_labels) and num_clusters_new != 1: #Should not count noise labels as a set of labels
                 num_clusters_new -= 1
+    visualize(points=points, cluster_labels=None, minPts=min_pts, distance="dc_dist", centers=centers, save=save_visualization, save_name=image_save_name)
 
+    plot_tree(root, hdb_new_labels, None, save=save_visualization, save_name=image_save_name)
+    raise AssertionError("stop")
 
-    hdbscan = HDBSCAN(min_cluster_size=2, min_samples = min_pts)
+    hdbscan = HDBSCAN(min_cluster_size=mcs, min_samples = min_pts)
     hdbscan.fit(points)
     hdb_labels = hdbscan.labels_
 
@@ -148,6 +151,8 @@ if __name__ == '__main__':
     hk = str(num_clusters)
     hk_new = str(num_clusters_new)
 
+    print("equal if zero:", np.count_nonzero(normalize_cluster_ordering(hdb_labels) -normalize_cluster_ordering(hdb_new_labels)) )
+
 
     ################################### RESULTS VISUALIZATION #####################################
     #Plot the complete graph from the dataset with the specified distance measure on all of the edges. Optionally show the distances in embedded space with MDS.
@@ -156,7 +161,6 @@ if __name__ == '__main__':
         #Plot the dc-tree, optionally with the centers from the final kmeans clusters marked in red
         #plot_tree(root, kmeans_labels, kmeans.center_indexes, save=save_visualization, save_name=image_save_name)
         #plot_tree(root, hdb_labels, None, save=save_visualization, save_name=image_save_name)
-
 
     #Plot the final clustering of the datapoints in 2D euclidean space.
     plot_points = points

@@ -141,14 +141,14 @@ class HDBSCAN(object):
                 else:
                     total_stability = left_stability + right_stability 
                     all_clusters = left_clusters + right_clusters #append the clusters together, as there is no noise in either branch
-                    new_stability = self.cluster_stability(dc_tree, parent_dist, tree_size)
+                    new_stability = self.cluster_stability(dc_tree, parent_dist, tree_size, cdists)
                     
-                    # print("nodes: ", np.array(self.get_leaves(dc_tree))+1)
-                    # print("old below sum stability:", total_stability)
-                    # print("left, right:", left_stability, right_stability)
-                    # print("Own dist:", dc_tree.dist)
-                    # print("parent_dist:", parent_dist)
-                    # print("new stability:", new_stability)
+                    print("nodes: ", np.array(self.get_leaves(dc_tree))+1)
+                    print("old below sum stability:", total_stability)
+                    print("left, right:", left_stability, right_stability)
+                    print("Own dist:", dc_tree.dist)
+                    print("parent_dist:", parent_dist)
+                    print("new stability:", new_stability)
                     
                     if new_stability >= total_stability: #Should be bigger than or equal to encompass that we get all the noise points added every time.
                         return [dc_tree], new_stability
@@ -157,7 +157,7 @@ class HDBSCAN(object):
 
 
 
-    def cluster_stability(self, dc_tree, parent_dist, tree_size):
+    def cluster_stability(self, dc_tree, parent_dist, tree_size, cdists):
         '''
         All internal nodes have an ID of none. 
         The dc_tree given here might be some sub-tree of the full "big" tree.
@@ -174,7 +174,11 @@ class HDBSCAN(object):
         
         '''
         emax = tree_size/parent_dist
-        eminsum = self.sub_contribution(dc_tree)
+        eminsum = 0
+        if self.min_cluster_size > 1:
+            eminsum = self.sub_contribution(dc_tree)
+        else:
+            eminsum = self.sub_contribution_1(dc_tree, cdists)
         return eminsum - emax
     
     def sub_contribution(self, dc_tree):
@@ -199,6 +203,27 @@ class HDBSCAN(object):
             return (left_size+right_size) * (1/dc_tree.dist)
 
 
+    def sub_contribution_1(self, dc_tree, cdists):
+        '''
+        For min_cluster_size = 1. 
+        Given a cluster C, this computes: sum_{x in C} 1 / emin(x,C).
+        This is never called on a leaf / noise. 
+        '''
+
+        left_size = self.get_tree_size(dc_tree.left_tree)
+        right_size = self.get_tree_size(dc_tree.right_tree)
+        if left_size == self.min_cluster_size and right_size == self.min_cluster_size:
+            #Both sides noise
+            return (1/cdists[dc_tree.left_tree.point_id]) + (1/cdists[dc_tree.right_tree.point_id])
+        elif left_size == self.min_cluster_size:
+            #LHS noise
+            return (1/cdists[dc_tree.left_tree.point_id]) + right_size * (1/dc_tree.right_tree.dist)
+        elif right_size == self.min_cluster_size:
+            #RHS noise
+            return (1/cdists[dc_tree.right_tree.point_id]) + left_size * (1/dc_tree.left_tree.dist)
+        else:
+            #Cluster merging
+            return (left_size+right_size) * (1/dc_tree.dist)
 
 
     def get_tree_size(self, dc_tree):
