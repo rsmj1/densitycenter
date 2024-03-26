@@ -31,11 +31,11 @@ class DCKMedian(object):
               continue
            centers[i] = j
            curr_value = self.kmedian_loss(points, centers, dc_tree)
-           print(centers, "curr_value:", curr_value)
+           #print(centers, "curr_value:", curr_value)
            if curr_value < best_value:
               best_value = curr_value
               best_new_point = j
-        print("best point:", best_new_point)
+        #print("best point:", best_new_point)
         centers[i] = best_new_point
         centers_lookup.add(best_new_point)
 

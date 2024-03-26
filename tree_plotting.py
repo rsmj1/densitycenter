@@ -120,7 +120,7 @@ def plot_tree(root, labels, centers=None, save=False, save_name=None):
     plt.show()
 
 
-def plot_embedding(embed_points, embed_labels, titles, centers = None, dot_scale = 1, save=False, save_name=None):
+def plot_embedding(embed_points, embed_labels, titles, centers = None, main_title=None, dot_scale = 1, save=False, save_name=None):
     '''
     Plots the provided points with as many embeddings as there are sets of lables and titles. Will highlight centers in k-means embeddings if provided.
 
@@ -154,6 +154,9 @@ def plot_embedding(embed_points, embed_labels, titles, centers = None, dot_scale
             axes[i].scatter(centers[:, 0], centers[:,1], c="none", s=dot_size, edgecolor="r")
             co += 1
     
+    if main_title is not None:
+        fig.suptitle(main_title)
+
     if save:
         if save_name is None:
             save_name = str(datetime.now())

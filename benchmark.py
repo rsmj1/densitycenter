@@ -24,6 +24,7 @@ from kmeans import DCKMeans
 from sklearn.cluster import HDBSCAN
 from sklearn.cluster import KMeans
 from HDBSCAN import HDBSCAN as newScan
+from kmedian import DCKMedian
 
 from point_gen import create_hierarchical_clusters
 from visualization import visualize, print_numpy_code
@@ -204,12 +205,12 @@ def brute_force_comparision(num_points, min_pts, max_iters=100):
 
     return
 
-def benchmark(dataset_types, num_points, num_runs, runtypes, k, min_pts, eps, metrics=["nmi"],visualize_results=False, save_results=False, save_name="test", plot_embeddings = False):
+def benchmark(dataset_types, num_points, num_runs, runtypes, k, min_pts, eps, metrics=["nmi"],visualize_results=False, save_results=False, save_name="test", plot_clusterings = False):
     '''
     Runs a set of algorithms "runtypes" on a set of datasets "dataset_types" with "num_runs" iterations on each dataset. 
     Within an iteration i of num_runs, will use the k (number of clusters) output from DBSCAN or HDBSCAN on algorithms that come after it.
     Makes a comparison grid for each specified metric between the set of labels averaging across the num_runs runs of all algorithms on a dataset. 
-    Therefore, the result is  (len(runtypes)+1) x (len(runtypes)+1) x (len(dataset_types)*len(metrics)). 
+    Therefore, the result is  (len(runtypes)+1) x (len(runtypes)+1) x (len(dataset_types)*len(metrics)). Each layer of this 3-dimensional grid is a comparison matrix averaged over the number of runs for one of the chosen metrics.
     Can output it to a CSV file, where the k, min_pts and eps values used for the run are appended to the algorithm name in the headers in that order. -1 means not applicable for that algorithm.
 
     Parameters
@@ -248,7 +249,7 @@ def benchmark(dataset_types, num_points, num_runs, runtypes, k, min_pts, eps, me
     save_name : String, default="test"
         The name under which to save the CSV-file.
     
-    plot_embeddings : Boolean, default=False
+    plot_clusterings : Boolean, default=False
         Whether to plot the clusterings for each dataset or not. TODO
     '''
     num_runtypes = len(runtypes)
@@ -287,7 +288,7 @@ def benchmark(dataset_types, num_points, num_runs, runtypes, k, min_pts, eps, me
                     #Only 1 run, can always just put the k
                     header = runtype+"_"+str(curr_k)+"_"+str(used_min_pts)+"_"+str(used_eps)
                 elif i == 0:
-                    #Multiple runs, only put k if before DB or HDB as they alter the K
+                    #Multiple runs, only put k if before DB or HDB as they alter the K (and we take averages  in the metric output)
                     if not after_hdb:
                         header = runtype+"_"+str(curr_k)+"_"+str(used_min_pts)+"_"+str(used_eps)
                     else:
@@ -296,24 +297,27 @@ def benchmark(dataset_types, num_points, num_runs, runtypes, k, min_pts, eps, me
                     for m in range(num_metrics):
                         headers[r, num_metrics*d+m] = header
                         headers[num_runtypes, num_metrics*d+m] = "Ground Truth k"+str(len(np.unique(ground_truths))) #Put ground truth as last element in square
-
-                
+   
             #Do comparison between the different algorithms TODO: Should run this for each metric
             for m, metric in enumerate(metrics):          
                 comparison_matrix[:,:,i, m] = metric_matrix(curr_labels, metric)
+
+            if plot_clusterings:
+                #TODO: Make it possible to give a plot_embedding header
+                plot_embedding(points, list(curr_labels), list(headers[:,num_metrics*d+m]), centers=None, dot_scale=0.8, main_title=dataset_type + " with "+ str(num_points) + " points")
+
+    
             
         for m, metric in enumerate(metrics):
             averaged_comparisons = np.mean(comparison_matrix[:,:,:,m], axis=2)
             benchmark_results[:,:,d*num_metrics+m] = averaged_comparisons #Insert the averaged values into the benchmark results #TODO WRONG
             #Create metadata header for each matrix
-            rundata.append("Dataset " + dataset_type + ", points: "+ str(num_points) + ", runs: "+ str(num_runs)+ ", metric: "+ metric)
+            rundata.append("d:" + dataset_type + ",p:"+ str(num_points) + ",r:"+ str(num_runs)+ ",m:"+ metric)
 
-    print("headers:", headers)
     if save_results:
         results_to_csv(benchmark_results, headers, rundata, save_name)
-    
-    display_results(benchmark_results, headers, rundata, datasets) #Should get as input the actual datasets to display the clusterings
-    print_results(benchmark_results, rundata, runtypes)
+    if visualize_results:
+        display_results(benchmark_results, headers, rundata, dataset_types, metrics) #Should get as input the actual datasets to display the clusterings
     return
 
 def results_to_csv(results, headers, rundata, file_name):
@@ -333,10 +337,37 @@ def results_to_csv(results, headers, rundata, file_name):
     return
 
 
-def display_results(results, headers, dataset_types, datasets):
+def display_results(results, headers, rundata, dataset_types, metrics):
     '''
-    Displays the comparative cluster metrics in heatmap grids
+    Displays the comparative cluster metrics in heatmap grids. 
+    The grid of heatmaps is num_datasets x num_metrics big
+
     '''
+    num_datasets = len(dataset_types)
+    num_metrics = len(metrics)
+    fig, axes = plt.subplots(num_datasets, num_metrics)
+
+    for d in range(num_datasets):
+        for m in range(num_metrics):
+            ax = axes[d,m]
+            curr_layer = num_metrics*d+m
+            curr_map = results[:,:,curr_layer]
+            curr_header = headers[:,curr_layer]
+            curr_header = ["("+str(i)+") "+header for i,header in enumerate(curr_header)]
+            im = ax.imshow(curr_map, cmap='viridis', interpolation=None)
+            ax.set_title(rundata[curr_layer])
+            ax.set_yticks(range(len(curr_header)))
+            ax.set_xticks(range(len(curr_header)))
+            ax.set_yticklabels(curr_header)
+            fig.colorbar(im, ax=ax)
+
+            for (j,i),label in np.ndenumerate(curr_map):
+                ax.text(i,j,np.round(label, 2),ha='center',va='center', fontsize='small')
+
+
+
+    plt.tight_layout()
+    plt.show()
     return
 
 def print_results(results, row_headers, col_headers):
@@ -406,8 +437,11 @@ def benchmark_single(points, runtype, k, min_pts, eps):
         labels = dckmeans.labels_
         used_min_pts = min_pts
 
-    elif runtype == "HUNGRYKMEANS":
-        print("TODO")
+    elif runtype == "DCKMEDIAN":
+        dckmedian = DCKMedian(k=k, min_pts=min_pts)
+        dckmedian.fit(points)
+        labels = dckmedian.labels_
+        used_min_pts = min_pts
     else:
         raise AssertionError("runtype", runtype, "does not exist...")
     return labels, k, used_min_pts, used_eps
@@ -415,7 +449,7 @@ def benchmark_single(points, runtype, k, min_pts, eps):
 
 if __name__ == "__main__":
     #brute_force_comparision(num_points=10, min_pts=3)
-    benchmark(dataset_types=["moon", "gauss", "circle"], num_points=10, num_runs=3, runtypes=["KMEANS", "HDBSCAN", "DCKMEANS"], metrics=["nmi", "test"], k=3, min_pts=3, eps=2, save_results=True)
+    benchmark(dataset_types=["moon", "gauss", "circle"], num_points=10, num_runs=3, runtypes=["KMEANS", "HDBSCAN", "DCKMEANS"], metrics=["nmi", "test"], k=3, min_pts=3, eps=2, save_results=True, visualize_results=True, plot_clusterings=False)
 
 
 

@@ -25,3 +25,4 @@ Feel free to email if you have any questions -- draganovandrew@cs.au.dk
 TODO:
 1. Implement K-median with greedy optimal
 2. Implpement variations on HDBSCAN stability function that might change the characteristics of how the function behaves. 
+3. Implement proper cluster visualization in benchmark.py

@@ -133,6 +133,7 @@ if __name__ == '__main__':
     kmedian.fit(points)
 
     kmedian_labels = kmedian.labels_
+    kmedian_centers = kmedian.center_indexes
     print("kmedian labels:", kmedian_labels)
 
     '''
@@ -151,7 +152,6 @@ if __name__ == '__main__':
     dbscan_labels = dbscan.labels_
 
 
-
     hdbscan_new = newScan(min_pts = min_pts, min_cluster_size=1)
     hdbscan_new.fit(points)
     hdb_new_labels = hdbscan_new.labels_
@@ -160,8 +160,8 @@ if __name__ == '__main__':
                 num_clusters_new -= 1
     #visualize(points=points, cluster_labels=None, minPts=min_pts, distance="dc_dist", centers=centers, save=save_visualization, save_name=image_save_name)
 
-    plot_tree(root, kmedian_labels, None, save=save_visualization, save_name=image_save_name)
-    raise AssertionError("stop")
+    #plot_tree(root, kmedian_labels, kmedian_centers, save=save_visualization, save_name=image_save_name)
+    #raise AssertionError("stop")
 
     hdbscan = HDBSCAN(min_cluster_size=mcs, min_samples = min_pts)
     hdbscan.fit(points)
