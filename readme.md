@@ -17,3 +17,11 @@ You will have to download the coil-100 dataset from [here](https://www.kaggle.co
 into the path `data/coil-100`.
 
 Feel free to email if you have any questions -- draganovandrew@cs.au.dk
+
+
+
+
+
+TODO:
+1. Implement K-median with greedy optimal
+2. Implpement variations on HDBSCAN stability function that might change the characteristics of how the function behaves. 

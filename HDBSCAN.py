@@ -148,12 +148,12 @@ class HDBSCAN(object):
                     all_clusters = left_clusters + right_clusters #append the clusters together, as there is no noise in either branch
                     new_stability = self.cluster_stability(dc_tree, parent_dist, tree_size, cdists)
                     
-                    print("nodes: ", np.array(self.get_leaves(dc_tree))+1)
-                    print("old below sum stability:", total_stability)
-                    print("left, right:", left_stability, right_stability)
-                    print("Own dist:", dc_tree.dist)
-                    print("parent_dist:", parent_dist)
-                    print("new stability:", new_stability)
+                    # print("nodes: ", np.array(self.get_leaves(dc_tree))+1)
+                    # print("old below sum stability:", total_stability)
+                    # print("left, right:", left_stability, right_stability)
+                    # print("Own dist:", dc_tree.dist)
+                    # print("parent_dist:", parent_dist)
+                    # print("new stability:", new_stability)
                     
                     if new_stability >= total_stability: #Should be bigger than or equal to encompass that we get all the noise points added every time.
                         return [dc_tree], new_stability

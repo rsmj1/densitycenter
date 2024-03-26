@@ -277,7 +277,7 @@ def benchmark(dataset_types, num_points, num_runs, runtypes, k, min_pts, eps, me
 
             after_hdb = False
             for r, runtype in enumerate(runtypes):
-                if runtype == "HDBSCAN" or runtype == "DBSCAN":
+                if runtype == "HDBSCAN" or runtype == "DBSCAN" or runtype == "HDBSCAN_NEW":
                     after_hdb = True #If algo run after HDB the K could be variable and should not be part of the header (if multiple runs)
                 labels, curr_k, used_min_pts, used_eps = benchmark_single(points, runtype, curr_k, min_pts, eps)
                 #Add the output labels to the collection of labels for this current dataset

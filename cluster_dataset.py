@@ -2,14 +2,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.datasets import make_swiss_roll, make_moons
 from sklearn.manifold import MDS
-from sklearn.cluster import SpectralClustering
-from DBSCAN import DBSCAN
 from sklearn.metrics import normalized_mutual_info_score as nmi
 from sklearn.decomposition import PCA
 import networkx as nx
 from datetime import datetime
 import time
-#import hdbscan
 
 from experiment_utils.get_data import get_dataset, make_circles
 from distance_metric import get_dc_dist_matrix
@@ -17,27 +14,33 @@ from density_tree import make_tree
 from tree_plotting import plot_embedding
 from tree_plotting import plot_tree
 from cluster_tree import dc_clustering
-#from GDR import GradientDR
-from SpectralClustering import get_lambdas, get_sim_mx, run_spectral_clustering
-
-#My addons
-from kmeans import DCKMeans
-from sklearn.cluster import HDBSCAN
-from sklearn.cluster import KMeans
 from point_gen import create_hierarchical_clusters
 from visualization import visualize
 from benchmark import create_dataset
-from HDBSCAN import HDBSCAN as newScan
 from benchmark import normalize_cluster_ordering
+
+
+#Algorithms
+from sklearn.cluster import SpectralClustering
+from SpectralClustering import get_lambdas, get_sim_mx, run_spectral_clustering
+from sklearn.cluster import HDBSCAN
+from sklearn.cluster import KMeans
+
+from kmeans import DCKMeans
+from kmedian import DCKMedian
+from DBSCAN import DBSCAN
+from HDBSCAN import HDBSCAN as newScan
+
 
 if __name__ == '__main__': 
     #################### RUN PARAMETERS HERE #######################
 
     num_points = 12
-    k = 2
+    k = 4
     min_pts = 2
     plot_tree_bool = False
     n_neighbors = 15
+    eps = 2
     dataset_type = "moon" 
     save_dataset = False
     load_dataset = False #If true will override the other params and just load from the filename.
@@ -88,6 +91,20 @@ if __name__ == '__main__':
     #                    [20,21], #5
     #                    [21,20],
     #                    ])
+
+    # points = np.array([[0,1],
+    #                    [0,2],
+    #                    [0,3],
+    #                    [1,2],
+    #                    [2,1], #5
+    #                    [2,2],
+    #                    [2,3],
+    #                    [3,2],
+    #                    [4,1],
+    #                    [4,2], #10
+    #                    [4,3],
+    #                    [4,4]]) # This set makes an error in dc_clustering
+
     root, dc_dists = make_tree(
     points,
     labels,
@@ -98,7 +115,7 @@ if __name__ == '__main__':
 
     
     #K-center
-    pred_labels, kcenter_centers, epsilons = dc_clustering(root, num_points=len(labels), k=k, min_points=min_pts,)
+    pred_labels, kcenter_centers, epsilons = dc_clustering(root, num_points=len(labels), k=k, min_points=min_pts,with_noise=True)
 
     
 
@@ -111,7 +128,12 @@ if __name__ == '__main__':
     centers = kmeans.centers
 
 
+    #K-median clustering
+    kmedian = DCKMedian(k=k, min_pts=min_pts)
+    kmedian.fit(points)
 
+    kmedian_labels = kmedian.labels_
+    print("kmedian labels:", kmedian_labels)
 
     '''
     HDBSCAN clustering:
@@ -124,15 +146,21 @@ if __name__ == '__main__':
     '''
     mcs = 4
 
+    dbscan = DBSCAN(eps=eps, min_pts=min_pts)
+    dbscan.fit(points)
+    dbscan_labels = dbscan.labels_
+
+
+
     hdbscan_new = newScan(min_pts = min_pts, min_cluster_size=1)
     hdbscan_new.fit(points)
     hdb_new_labels = hdbscan_new.labels_
     num_clusters_new = len(np.unique(hdb_new_labels))
     if np.isin(-1, hdb_new_labels) and num_clusters_new != 1: #Should not count noise labels as a set of labels
                 num_clusters_new -= 1
-    visualize(points=points, cluster_labels=None, minPts=min_pts, distance="dc_dist", centers=centers, save=save_visualization, save_name=image_save_name)
+    #visualize(points=points, cluster_labels=None, minPts=min_pts, distance="dc_dist", centers=centers, save=save_visualization, save_name=image_save_name)
 
-    plot_tree(root, hdb_new_labels, None, save=save_visualization, save_name=image_save_name)
+    plot_tree(root, kmedian_labels, None, save=save_visualization, save_name=image_save_name)
     raise AssertionError("stop")
 
     hdbscan = HDBSCAN(min_cluster_size=mcs, min_samples = min_pts)
