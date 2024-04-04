@@ -219,6 +219,7 @@ def get_dists(dist_type, points, minPts=3):
         n_neighbors=minPts, #Unused parameter
         min_points=minPts
     )
+    #print("dc_dist_matrix:", np.round(dists,2))
   #Mutual reachability distance
   elif dist_type == "mut_reach": 
     D = np.zeros([n, n])

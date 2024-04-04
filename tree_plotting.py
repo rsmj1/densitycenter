@@ -43,12 +43,14 @@ def make_node_lists(root, point_labels, parent_count, dist_list, edge_list, colo
         if centers is not None:
             if root.point_id in centers:
                 edgecolor_list.append("red")
-            else:
+            elif point_labels[root.point_id] != -1:
                 edgecolor_list.append("black")
-        else:
-            if point_labels[root.point_id] != -1:
+            else: 
+                edgecolor_list.append("yellow")
+        else: 
+            if point_labels[root.point_id] != -1: #Non-noise points
                 edgecolor_list.append("black")
-            else:
+            else: #Noise points:
                 edgecolor_list.append("yellow")
     else:
         color_list.append(-1)

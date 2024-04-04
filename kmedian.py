@@ -35,7 +35,7 @@ class DCKMedian(object):
            if curr_value < best_value:
               best_value = curr_value
               best_new_point = j
-        #print("best point:", best_new_point)
+        print("best value:", best_value)
         centers[i] = best_new_point
         centers_lookup.add(best_new_point)
 
@@ -74,7 +74,7 @@ class DCKMedian(object):
     n = points.shape[0]
     dists = np.array([[dc_tree.dc_dist(c,p_index) for c in centers] for p_index in range(n)])
     cluster_assignments = np.argmin(dists, axis=1)
-    print("cluster_assignments:", cluster_assignments)
+    #print("cluster_assignments:", cluster_assignments)
     return cluster_assignments
 
 

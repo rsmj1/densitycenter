@@ -157,6 +157,7 @@ def dc_kcenter(root, num_points, k, min_points, with_noise=True):
 
     clusters = cluster_tree(pruned_root, pruned_root, k=k)
     clusters = finalize_clusters(clusters)
+    print("clusters:", clusters)
     for cluster in clusters:
         cluster.points = deprune_cluster(cluster.peak.orig_node)
 

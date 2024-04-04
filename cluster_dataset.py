@@ -35,9 +35,11 @@ from HDBSCAN import HDBSCAN as newScan
 if __name__ == '__main__': 
     #################### RUN PARAMETERS HERE #######################
 
-    num_points = 12
+    num_points = 50
     k = 4
-    min_pts = 2
+    min_pts = 5
+    mcs = 2
+
     plot_tree_bool = False
     n_neighbors = 15
     eps = 2
@@ -71,7 +73,6 @@ if __name__ == '__main__':
 
 
     #Create the dataset and old dc_tree setup for methods that need it as input
-    points, labels = create_dataset(num_points=num_points, type=dataset_type, save=save_dataset, load=load_dataset, save_name=save_name, load_name=load_name)
     points = np.array([[1,2],
                        [1,4],
                        [2,3],
@@ -84,6 +85,9 @@ if __name__ == '__main__':
                        [16,17], #10
                        [18,19],
                        [19,18]])
+    labels = np.array([0,1,2,3,4,5,6,7,8,9,10,11])
+    # points, labels = create_dataset(num_points=num_points, type=dataset_type, save=save_dataset, load=load_dataset, save_name=save_name, load_name=load_name)
+
     # points = np.array([[1,2],
     #                    [2,1],
     #                    [10,11],
@@ -91,6 +95,7 @@ if __name__ == '__main__':
     #                    [20,21], #5
     #                    [21,20],
     #                    ])
+    # labels = np.array([0,1,2,3,4,5])
 
     # points = np.array([[0,1],
     #                    [0,2],
@@ -104,6 +109,7 @@ if __name__ == '__main__':
     #                    [4,2], #10
     #                    [4,3],
     #                    [4,4]]) # This set makes an error in dc_clustering
+    # labels = np.array([0,1,2,3,4,5,6,7,8,9,10,11])
 
     root, dc_dists = make_tree(
     points,
@@ -115,9 +121,9 @@ if __name__ == '__main__':
 
     
     #K-center
-    pred_labels, kcenter_centers, epsilons = dc_clustering(root, num_points=len(labels), k=k, min_points=min_pts,with_noise=True)
+    pred_labels, kcenter_centers, epsilons = dc_clustering(root, num_points=len(labels), k=k, min_points=min_pts,with_noise=False)
 
-    
+    #print("Pred labels:", pred_labels)
 
 
     #K-means clustering
@@ -134,7 +140,7 @@ if __name__ == '__main__':
 
     kmedian_labels = kmedian.labels_
     kmedian_centers = kmedian.center_indexes
-    print("kmedian labels:", kmedian_labels)
+    #print("kmedian labels:", kmedian_labels)
 
     '''
     HDBSCAN clustering:
@@ -145,14 +151,13 @@ if __name__ == '__main__':
     - metric: default = 'euclidean'
 
     '''
-    mcs = 4
 
     dbscan = DBSCAN(eps=eps, min_pts=min_pts)
     dbscan.fit(points)
     dbscan_labels = dbscan.labels_
 
 
-    hdbscan_new = newScan(min_pts = min_pts, min_cluster_size=1)
+    hdbscan_new = newScan(min_pts=min_pts, min_cluster_size=mcs)
     hdbscan_new.fit(points)
     hdb_new_labels = hdbscan_new.labels_
     num_clusters_new = len(np.unique(hdb_new_labels))
@@ -163,7 +168,7 @@ if __name__ == '__main__':
     #plot_tree(root, kmedian_labels, kmedian_centers, save=save_visualization, save_name=image_save_name)
     #raise AssertionError("stop")
 
-    hdbscan = HDBSCAN(min_cluster_size=mcs, min_samples = min_pts)
+    hdbscan = HDBSCAN(min_cluster_size=mcs, min_samples=min_pts)
     hdbscan.fit(points)
     hdb_labels = hdbscan.labels_
 
@@ -180,12 +185,16 @@ if __name__ == '__main__':
     hk_new = str(num_clusters_new)
 
     print("equal if zero:", np.count_nonzero(normalize_cluster_ordering(hdb_labels) -normalize_cluster_ordering(hdb_new_labels)) )
-
+    print("New:", normalize_cluster_ordering(hdb_new_labels))
+    print("Old:", normalize_cluster_ordering(hdb_labels))
 
     ################################### RESULTS VISUALIZATION #####################################
     #Plot the complete graph from the dataset with the specified distance measure on all of the edges. Optionally show the distances in embedded space with MDS.
     if points.shape[0] < 20:
-        visualize(points=points, cluster_labels=kmeans_labels, minPts=min_pts, distance="dc_dist", centers=centers, save=save_visualization, save_name=image_save_name)
+        visualize(points=points, cluster_labels=hdb_labels, minPts=min_pts, distance="dc_dist", centers=centers, save=save_visualization, save_name=image_save_name)
+        plot_tree(root, hdb_new_labels, None, save=save_visualization, save_name=image_save_name)
+        plot_tree(root, hdb_labels, None, save=save_visualization, save_name=image_save_name)
+
         #Plot the dc-tree, optionally with the centers from the final kmeans clusters marked in red
         #plot_tree(root, kmeans_labels, kmeans.center_indexes, save=save_visualization, save_name=image_save_name)
         #plot_tree(root, hdb_labels, None, save=save_visualization, save_name=image_save_name)
@@ -194,8 +203,8 @@ if __name__ == '__main__':
     plot_points = points
     plot_embedding(
         plot_points,
-        [labels   , pred_labels             , kmeans_labels , hdb_new_labels         , hdb_labels  , kmeans_labels_hk],
-        ['truth'+k, 'k-Center on DC-dists'+k, 'K-means'+k   , '(new)HDBSCAN' + hk_new, "HDBSCAN"+hk, 'K-means'+ hk],
+        [labels                            , pred_labels             , kmeans_labels , hdb_new_labels         , hdb_labels  , kmeans_labels_hk],
+        ['truth'+str(len(np.unique(labels))), 'k-Center on DC-dists'+k, 'K-means'+k   , '(new)HDBSCAN' + hk_new, "HDBSCAN"+hk, 'K-means'+ hk],
         centers=centers,
         dot_scale=0.5
     )

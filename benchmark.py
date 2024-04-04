@@ -277,6 +277,7 @@ def benchmark(dataset_types, num_points, num_runs, runtypes, k, min_pts, eps, me
             curr_labels[num_runtypes] = ground_truths
 
             after_hdb = False
+            plot_cluster_details = []
             for r, runtype in enumerate(runtypes):
                 if runtype == "HDBSCAN" or runtype == "DBSCAN" or runtype == "HDBSCAN_NEW":
                     after_hdb = True #If algo run after HDB the K could be variable and should not be part of the header (if multiple runs)
@@ -284,27 +285,28 @@ def benchmark(dataset_types, num_points, num_runs, runtypes, k, min_pts, eps, me
                 #Add the output labels to the collection of labels for this current dataset
                 curr_labels[r] = labels
                 header = ""
+                plot_cluster_details.append(runtype+"_k"+str(curr_k)+"_pts"+str(used_min_pts)+"_e"+str(used_eps))
                 if i == 0 and num_runs == 1:
                     #Only 1 run, can always just put the k
                     header = runtype+"_"+str(curr_k)+"_"+str(used_min_pts)+"_"+str(used_eps)
                 elif i == 0:
                     #Multiple runs, only put k if before DB or HDB as they alter the K (and we take averages  in the metric output)
                     if not after_hdb:
-                        header = runtype+"_"+str(curr_k)+"_"+str(used_min_pts)+"_"+str(used_eps)
+                        header = runtype+"_k"+str(curr_k)+"_pts"+str(used_min_pts)+"_e"+str(used_eps)
                     else:
-                        header = runtype+"_"+"dbK"+"_"+str(used_min_pts)+"_"+str(used_eps)
-                if i== 0:
+                        header = runtype+"_kvar"+"_pts"+str(used_min_pts)+"_e"+str(used_eps)
+                if i == 0:
                     for m in range(num_metrics):
                         headers[r, num_metrics*d+m] = header
                         headers[num_runtypes, num_metrics*d+m] = "Ground Truth k"+str(len(np.unique(ground_truths))) #Put ground truth as last element in square
-   
+            plot_cluster_details.append("Ground Truth k"+str(len(np.unique(ground_truths))))
             #Do comparison between the different algorithms TODO: Should run this for each metric
             for m, metric in enumerate(metrics):          
                 comparison_matrix[:,:,i, m] = metric_matrix(curr_labels, metric)
 
             if plot_clusterings:
                 #TODO: Make it possible to give a plot_embedding header
-                plot_embedding(points, list(curr_labels), list(headers[:,num_metrics*d+m]), centers=None, dot_scale=0.8, main_title=dataset_type + " with "+ str(num_points) + " points")
+                plot_embedding(points, list(curr_labels), plot_cluster_details, centers=None, dot_scale=0.8, main_title=dataset_type + " with "+ str(num_points) + " points")
 
     
             
@@ -370,13 +372,6 @@ def display_results(results, headers, rundata, dataset_types, metrics):
     plt.show()
     return
 
-def print_results(results, row_headers, col_headers):
-    '''
-    Prints the benchmark data to the console for a quick glance.
-    '''
-
-
-    return
 
 def metric_matrix(label_results, metric="nmi"):
     '''
@@ -399,8 +394,8 @@ def benchmark_single(points, runtype, k, min_pts, eps):
     Runs the provided runtype on points and returns the k, min_pts and eps used in the algorithm and the resulting labels.
     '''
     labels = None
-    used_min_pts = -1
-    used_eps = -1
+    used_min_pts = 0
+    used_eps = 0
     if runtype == "HDBSCAN":
         hdbscan = HDBSCAN(min_cluster_size=2, min_samples = min_pts)
         hdbscan.fit(points)
@@ -449,23 +444,6 @@ def benchmark_single(points, runtype, k, min_pts, eps):
 
 if __name__ == "__main__":
     #brute_force_comparision(num_points=10, min_pts=3)
-    benchmark(dataset_types=["moon", "gauss", "circle"], num_points=10, num_runs=3, runtypes=["KMEANS", "HDBSCAN", "DCKMEANS"], metrics=["nmi", "test"], k=3, min_pts=3, eps=2, save_results=True, visualize_results=True, plot_clusterings=False)
+    benchmark(dataset_types=["moon", "gauss", "circle"], num_points=500, num_runs=3, runtypes=["KMEANS","DCKMEANS", "HDBSCAN", "DCKMEANS"], metrics=["nmi", "test"], k=3, min_pts=3, eps=2, save_results=True, visualize_results=True, plot_clusterings=True)
 
 
-
-'''
-TODO:
-Additionally, we should have a code framework to make comparisons of all the algorithms against one another.
-The relevant algorithms are:
-kmeans
-kmeans on the dc-dists
-hungry kmeans on the dc-dists
-dbscan
-hdbscan
-We then want to compare their results against ground truths and each others. This should be a quantitative and qualitative comparison, with means over runs and random seeds, etc.
-Interesting because it will force us to have a good appreciation of where each method finds different solutions.
-
-- TODO: Also we should bruteforce compare HDBSCAN to K-means to look for the optimal solutions
-
-- TODO: Also currently Sklearn.HDBSCAN has min_cluster_size of at least 2... So cannot compare directly currently, need a way to set it to 1.
-'''

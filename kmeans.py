@@ -4,7 +4,7 @@ import numpy as np
 
 class DCKMeans(object):
 
-  def __init__(self, *, k, min_pts, method="plusplus", max_iters=100):
+  def __init__(self, *, k, min_pts, method="optimal", max_iters=100):
         self.k = k # The number of clusters that the given kmeans algorithm chosen will use
         self.min_pts = min_pts
         self.method = method # The methods are "naive", "plusplus", "hungry"
@@ -23,11 +23,40 @@ class DCKMeans(object):
       #print("labels after:", self.labels_)
     elif self.method == "naive":
       self.naive_dc_kmeans(points, self.min_pts)
-    elif self.method == "hungry":
-       print("TODO")
+    elif self.method == "optimal":
+       self.solve(points, self.min_pts)
 
 
 
+  def solve(self, points):
+      '''
+      Solves the K-means problem optimally over the dc-distance in O(n^2k time).
+      It does so by greedily choosing the next center as the point that reduces the cost the most. 
+      '''
+      n = points.shape[0]
+      dc_tree = dcdist.DCTree(points, min_points=self.min_pts, n_jobs=1)
+      centers = []
+      centers_lookup = set()
+      for i in range(self.k):
+          centers.append(-1)
+          best_value = np.inf
+          best_new_point = -1
+          for j in range(n):
+            if j in centers_lookup:
+                continue
+            centers[i] = j
+            curr_value = self.kmeans_loss(points, centers, dc_tree)
+            #print(centers, "curr_value:", curr_value)
+            if curr_value < best_value:
+                best_value = curr_value
+                best_new_point = j
+          #print("best point:", best_new_point)
+          centers[i] = best_new_point
+          centers_lookup.add(best_new_point)
+
+      self.labels_ = self.assign_points(points, centers, dc_tree)
+      self.center_indexes = centers
+      self.centers = points[centers]
 
 
   def basic_dc_lloyds(self, points, dc_tree, cluster_center_indexes, max_iters=100):

@@ -142,18 +142,20 @@ class HDBSCAN(object):
                 right_clusters, right_stability = self.compute_clustering(dc_tree.right_tree, cdists, dc_tree.dist)
 
                 if parent_dist is None: #Root call has no parent_dist.
+                    #TODO: If it's the root we might still have a case where the point is not a true split.. Need to account for that. 
+                    #Should just use the root distance itself here rather than the parent distance.
                     return left_clusters + right_clusters #We do not really need to do this, however the algorithm specifically specifies this as it stands.
                 else:
                     total_stability = left_stability + right_stability 
                     all_clusters = left_clusters + right_clusters #append the clusters together, as there is no noise in either branch
                     new_stability = self.cluster_stability(dc_tree, parent_dist, tree_size, cdists)
-                    
-                    # print("nodes: ", np.array(self.get_leaves(dc_tree))+1)
-                    # print("old below sum stability:", total_stability)
-                    # print("left, right:", left_stability, right_stability)
-                    # print("Own dist:", dc_tree.dist)
-                    # print("parent_dist:", parent_dist)
-                    # print("new stability:", new_stability)
+                    #TODO: I need to gather together all the noise at the same distance, as they might constitute a cluster.... 
+                    print("nodes: ", np.array(self.get_leaves(dc_tree))+1)
+                    print("old below sum stability:", total_stability)
+                    print("left, right:", left_stability, right_stability)
+                    print("Own dist:", dc_tree.dist)
+                    print("parent_dist:", parent_dist)
+                    print("new stability:", new_stability)
                     
                     if new_stability >= total_stability: #Should be bigger than or equal to encompass that we get all the noise points added every time.
                         return [dc_tree], new_stability
