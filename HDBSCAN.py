@@ -115,53 +115,85 @@ class HDBSCAN(object):
         The clusters are propagated bottom up as lists of lists. Each particle in this representation is determined by the size of min_cluster_size.
         The cluster representation returned is ([cluster1,...,clusterk], stability_sum), where clusteri = [atom1,...,atomt], where atomj = (tree_pointer, tree_size, breakoff_dist).
         Parent_dist is the maximal point at which the cluster exists.
+        
+        Same_dist is used to make note of distances where things need to be gathered
+        If same_dist is false and it has gotten noise returned from lower recursive levels it means that we are done gathering nodes from same distance and need to check whether they comprise a cluster or still just noise.
+        If same_dist is true and we have noise return it to the next level.
+        If same_dist is true and we do not have noise, merge and return any noise from lower levels to the next.
+        If we get noise from the level below it must mean that these are at the same distance, and the cluster from there should be propagated rather than including that noise in the cluster, since we don't yet know whether it's a cluster split or noise. 
         '''
+        same_dist = False
+        if dc_tree.dist == parent_dist:
+            same_dist = True
+        return_clusters = []
+        return_stability = 0
+        return_noise = []
         if dc_tree.is_leaf:
             if self.min_cluster_size > 1:
-                #Min cluster size is 2 here
-                return [], 0#This point is considered noise and fell out of the current cluster at this height
+                #Min cluster size is 2 or more here [POTENTIAL NOISE]
+                return [], 0, [dc_tree]#This point is considered noise and fell out of the current cluster at this height
             else:
                 #Min cluster size is 1 here. To compute the stability of single-node cluster we need the dc_dist in its parent. 
                 #TODO: If the difference is 0, then return point as noise. 
                 stability = (1/cdists[dc_tree.point_id]) - (1/parent_dist)
                 if stability > 0:
-                    return [dc_tree], stability #This computes the stability of the 1-point cluster. 0 If the cdist is the same as the adjacent edge that was removed at the split.
+                    return [dc_tree], stability, [] #This computes the stability of the 1-point cluster. 0 If the cdist is the same as the adjacent edge that was removed at the split.
                 else:
-                    return [], 0
+                    return [], 0, [dc_tree] #No need to set them here
         else:
             tree_size = self.get_tree_size(dc_tree)
             if self.min_cluster_size > tree_size:
-                return [], 0 #Noise
+                if same_dist:
+                    return [], 0, [dc_tree]
+                return [], 0, [] #Noise
             else:
                 #Propagate down the last change in cdist since all points connected in the tree with same value correspond to one big split at one level below that parent dist that gets propagated.
                 #TODO: We can reduce computation time by only computing a new stability when: We are at the top of a multi-split of same dc-distance. When we are below another cluster merge. 
                 #So what to do: The mission is to somehow only print the real clusters and nothing in between. 
                 #We do not explicitly need propagation information as the value inevitably is the same or higher at the top of the split anyways, so we cannot get the below clusters as real clusters anyways.
 
-                left_clusters, left_stability = self.compute_clustering(dc_tree.left_tree, cdists, dc_tree.dist)
-                right_clusters, right_stability = self.compute_clustering(dc_tree.right_tree, cdists, dc_tree.dist)
+                left_clusters, left_stability, left_noise = self.compute_clustering(dc_tree.left_tree, cdists, dc_tree.dist)
+                right_clusters, right_stability, right_noise = self.compute_clustering(dc_tree.right_tree, cdists, dc_tree.dist)
 
                 if parent_dist is None: #Root call has no parent_dist.
                     #TODO: If it's the root we might still have a case where the point is not a true split.. Need to account for that. 
                     #Should just use the root distance itself here rather than the parent distance.
+                    print("Root stability: ", left_stability + right_stability)
                     return left_clusters + right_clusters #We do not really need to do this, however the algorithm specifically specifies this as it stands.
                 else:
+
                     total_stability = left_stability + right_stability 
                     all_clusters = left_clusters + right_clusters #append the clusters together, as there is no noise in either branch
-                    new_stability = self.cluster_stability(dc_tree, parent_dist, tree_size, cdists)
-                    #TODO: I need to gather together all the noise at the same distance, as they might constitute a cluster.... 
-                    print("nodes: ", np.array(self.get_leaves(dc_tree))+1)
-                    print("old below sum stability:", total_stability)
-                    print("left, right:", left_stability, right_stability)
-                    print("Own dist:", dc_tree.dist)
-                    print("parent_dist:", parent_dist)
-                    print("new stability:", new_stability)
-                    
-                    if new_stability >= total_stability: #Should be bigger than or equal to encompass that we get all the noise points added every time.
-                        return [dc_tree], new_stability
-                    else:                        
-                        return all_clusters, total_stability
+                    total_noise = left_noise + right_noise
+                    #If we have same_dist, we need to keep propagating results from below until we don't...
 
+                    if not same_dist:
+                        noise_size = self.get_noise_size(total_noise)
+                        if noise_size >= self.min_cluster_size:
+                            print("Gathered noise:", [point + 1 for point in self.get_noise_leaves(total_noise)])
+                            #All the gathered noise will have the same height and now comprises a cluster itself
+                            noise_cluster_stability = noise_size / dc_tree.dist - noise_size / parent_dist
+                            print("Noise cluster stability:", noise_cluster_stability)
+                            total_stability += noise_cluster_stability
+                            print("Total stability:", total_stability)
+                            all_clusters = all_clusters + [total_noise]
+                            return all_clusters, total_stability, []
+                        else:
+                            new_stability = self.cluster_stability(dc_tree, parent_dist, tree_size, cdists)
+                            #TODO: I need to gather together all the noise at the same distance, as they might constitute a cluster.... 
+                            # print("nodes: ", np.array(self.get_leaves(dc_tree))+1)
+                            # print("old below sum stability:", total_stability)
+                            # print("left, right:", left_stability, right_stability)
+                            # print("Own dist:", dc_tree.dist)
+                            # print("parent_dist:", parent_dist)
+                            # print("new stability:", new_stability)
+                            
+                            if new_stability >= total_stability and not same_dist: #Should be bigger than or equal to encompass that we get all the noise points added every time.
+                                return [dc_tree], new_stability, []
+                            else:                      
+                                return all_clusters, total_stability, []
+                    else:
+                        return all_clusters, total_stability, total_noise
 
 
     def cluster_stability(self, dc_tree, parent_dist, tree_size, cdists):
@@ -274,6 +306,20 @@ class HDBSCAN(object):
         else:
             return self.get_tree_size(dc_tree.left_tree) + self.get_tree_size(dc_tree.right_tree)
         
+    def get_noise_size(self, noise_list):
+        '''
+        Gets as input a list of dc_trees all comprised of noise, and outputs the total number of leaves in this list.
+        '''
+        size = 0
+        for tree in noise_list:
+            size += self.get_tree_size(tree)
+        return size
+
+    def get_noise_leaves(self, noise_list):
+        leaves = []
+        for tree in noise_list:
+            leaves += self.get_leaves(tree)
+        return leaves
 
     def get_leaves(self, dc_tree):
         '''
@@ -293,9 +339,16 @@ class HDBSCAN(object):
         curr_label = 0
         output_labels = np.zeros(n) -1
         for cluster in clustering:
-            points = self.get_leaves(cluster)
-            for point in points:
-                output_labels[point] = curr_label
-            curr_label += 1
+            if isinstance(cluster, list): #A cluster comprised of gathered noise points at the same height
+                for noise in cluster:
+                    points = self.get_leaves(noise)
+                    for point in points:
+                        output_labels[point] = curr_label
+                curr_label += 1
+            else:
+                points = self.get_leaves(cluster)
+                for point in points:
+                    output_labels[point] = curr_label
+                curr_label += 1
 
         return output_labels
