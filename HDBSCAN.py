@@ -9,6 +9,11 @@ It has a funky way of letting quite noisy points be part of a cluster
 
 Implementation observations:
 - If we treat the root cluster separately we do get some issues in terms of noise clusters still being a thing, "ish". 
+- The reason why this is only an issue when treating the root path separately is because the noise clusters merged with the closest cluster will always give a higher stability. 
+- We still have the issue that these noise clusters will potentially fuck up the stability higher up in the tree if we don't specifically search for them.
+- So no matter what I need to fix the stability computation... If there is a split with something at the same dist in one of the subtree, we need to check whether there is actually any connected component to that side of the split...
+
+
 '''
 
 
@@ -25,7 +30,7 @@ class HDBSCAN(object):
 
     '''
 
-    def __init__(self, *, min_pts, min_cluster_size=1):
+    def __init__(self, *, min_pts, min_cluster_size=1, allow_single_cluster=False):
         '''
         
         Parameters
@@ -44,6 +49,7 @@ class HDBSCAN(object):
         self.min_pts = min_pts
         self.min_cluster_size = min_cluster_size
         self.labels_ = None
+        self.allow_single_cluster = allow_single_cluster
         
 
     def get_cdists(self, points, min_pts):
@@ -147,13 +153,20 @@ class HDBSCAN(object):
                 right_clusters, right_stability, right_last_clustering = self.compute_clustering(dc_tree.right_tree, cdists, dc_tree.dist)
 
                 if parent_dist is None: #Root call has no parent_dist.
-                    #TODO: If it's the root we might still have a case where the point is not a true split.. Need to account for that. 
-                    #Should just use the root distance itself here rather than the parent distance.
-                    #print("Root stability: ", left_stability + right_stability)
-                    if len(left_clusters + right_clusters) == 1:
-                        return left_last_clustering + right_last_clustering
+                    if not self.allow_single_cluster:
+                        if len(left_clusters + right_clusters) == 1:
+                            if len(left_last_clustering + right_last_clustering) == 1: #If we never saw any true cluster merge on the way up, return no clusters
+                                return []
+                            else:
+                                return left_last_clustering + right_last_clustering
+                        else:
+                            return left_clusters + right_clusters #We do not really need to do this, however the algorithm specifically specifies this as it stands. TODO: Make it optional
                     else:
-                        return left_clusters + right_clusters #We do not really need to do this, however the algorithm specifically specifies this as it stands. TODO: Make it optional
+                        if len(left_clusters + right_clusters) == 1: #If we allow a single cluster here we handle that last point is noise, we return all points as a single cluster. 
+                            return [dc_tree]
+                        else: 
+                            return left_clusters + right_clusters
+                                 
                 else:
                     total_stability = left_stability + right_stability 
                     all_clusters = left_clusters + right_clusters #append the clusters together, as there is no noise in either branch
@@ -170,10 +183,7 @@ class HDBSCAN(object):
                             return [dc_tree], new_stability, left_last_clustering + right_last_clustering
                     else:
                             if len(all_clusters) == 1:
-                                if len(left_last_clustering + right_last_clustering) == 1: #If we never saw any true cluster merge on the way up, return no clusters
-                                    return all_clusters, total_stability, []
-                                else:
-                                    return all_clusters, total_stability, left_last_clustering + right_last_clustering
+                                return all_clusters, total_stability, left_last_clustering + right_last_clustering
                             else: 
                                 return all_clusters, total_stability, all_clusters 
 
@@ -222,7 +232,13 @@ class HDBSCAN(object):
             return right_size * (1/dc_tree.dist) + self.sub_contribution(dc_tree.left_tree)
         else:
             #Cluster merging
-            return (left_size+right_size) * (1/dc_tree.dist)
+            #TODO: Check if true split or not.. i.e. check if there are any connected components on the ends of the same-dist area. 
+            real_lsize = left_size - self.count_equidist(dc_tree.left_tree, dc_tree.dist)
+            real_rsize = right_size - self.count_equidist(dc_tree.right_tree, dc_tree.dist)
+            if real_lsize >= self.min_cluster_size and real_rsize >= self.min_cluster_size:
+                return (left_size+right_size) * (1/dc_tree.dist)
+            else:
+                return self.sub_contribution(dc_tree.right_tree) + self.sub_contribution(dc_tree.left_tree)
 
 
     def sub_contribution_1(self, dc_tree, cdists): #Version with no noise points. If activating this, also remember to change the leaf case in compute_clustering to always return the point as a cluster even is stability is 0.
@@ -314,3 +330,21 @@ class HDBSCAN(object):
             curr_label += 1
 
         return output_labels
+    
+    def count_equidist(self, dc_tree, dist):
+        '''
+        Counts the number of points within the given dc_tree that are at the given distance dist.
+        '''
+        if dc_tree.dist != dist:
+            return 0
+        else:
+            lsize = self.get_tree_size(dc_tree.left_tree)
+            rsize = self.get_tree_size(dc_tree.right_tree)
+            if lsize == 1 and rsize == 1:
+                return 2
+            elif lsize == 1:
+                return 1 + self.count_equidist(dc_tree.right_tree, dist)
+            elif rsize == 1:
+                return 1 + self.count_equidist(dc_tree.left_tree, dist)
+            else: 
+                return self.count_equidist(dc_tree.right_tree, dist) + self.count_equidist(dc_tree.left_tree, dist)
