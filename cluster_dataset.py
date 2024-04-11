@@ -85,14 +85,9 @@ if __name__ == '__main__':
                        [16,17], #10
                        [18,19],
                        [19,18],
-                       [0,4.2],
-                       [0,4.1],
-                       [0,4],
-                       [0,4.21],
-                       [0,4.18]
                        ]
                        )
-    labels = np.array([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16])
+    labels = np.array([0,1,2,3,4,5,6,7,8,9,10,11])
     # points, labels = create_dataset(num_points=num_points, type=dataset_type, save=save_dataset, load=load_dataset, save_name=save_name, load_name=load_name)
 
     # points = np.array([[1,2],
