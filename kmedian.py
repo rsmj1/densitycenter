@@ -15,7 +15,15 @@ class DCKMedian(object):
 
   def fit(self, points):
     '''
-    Solves the K-median problem optimally over the dc-distance in O(n^2k time).
+    Solves the K-median problem optimally over the dc-distance. 
+    Currently with O(n^2k^2) complexity.
+    '''
+    self.simple_greedy(points)
+
+
+  def simple_greedy(self, points):
+    '''
+    Solves the K-median problem optimally over the dc-distance with O(n^2k^2) complexity.
     It does so by greedily choosing the next center as the point that reduces the cost the most. 
     '''
     n = points.shape[0]
@@ -42,7 +50,6 @@ class DCKMedian(object):
     self.labels_ = self.assign_points(points, centers, dc_tree)
     self.center_indexes = centers
     self.centers = points[centers]
-
 
   def kmedian_loss(self, points, centers, dc_tree):
     '''
@@ -77,7 +84,19 @@ class DCKMedian(object):
     #print("cluster_assignments:", cluster_assignments)
     return cluster_assignments
 
-
+  def efficient_greedy(self, points):
+     '''
+     Solves the K-median problem optimally with complexity O(n * log(n)).
+     It does so by greedily choosing the next center as the point that reduces the cost the most. 
+     '''
+     return
+  
+  def annotate_tree(self, tree):
+     '''
+     Does bottom-up on the dc-tree, generating an array 
+     '''
+     return
+  
 #Basic testing:
 #points = np.array([[1,6],[2,6],[6,2],[14,17],[123,3246],[52,8323],[265,73]])
 #points = np.array([[1,1],[2,2], [3,3], [3,2], [1,2], 

@@ -232,7 +232,7 @@ class HDBSCAN(object):
             return right_size * (1/dc_tree.dist) + self.sub_contribution(dc_tree.left_tree)
         else:
             #Cluster merging
-            #TODO: Check if true split or not.. i.e. check if there are any connected components on the ends of the same-dist area. 
+            #This checks if it is a true split or not!
             real_lsize = left_size - self.count_equidist(dc_tree.left_tree, dc_tree.dist)
             real_rsize = right_size - self.count_equidist(dc_tree.right_tree, dc_tree.dist)
             if real_lsize >= self.min_cluster_size and real_rsize >= self.min_cluster_size:
@@ -289,6 +289,7 @@ class HDBSCAN(object):
                 if cdists[dc_tree.right_tree.point_id] != dc_tree.dist:
                     return (1/cdists[dc_tree.right_tree.point_id]) + left_size * (1/dc_tree.left_tree.dist)
                 else:
+                    #TODO: Check if true merge or not here as well.
                     return (1/cdists[dc_tree.right_tree.point_id]) + self.sub_contribution_1_1(dc_tree.left_tree, cdists)
                 
             else:
