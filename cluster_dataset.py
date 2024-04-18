@@ -36,7 +36,7 @@ if __name__ == '__main__':
     #################### RUN PARAMETERS HERE #######################
 
     num_points = 50
-    k = 2
+    k = 4
     min_pts = 3
     mcs = 2
 
@@ -211,11 +211,12 @@ if __name__ == '__main__':
     if points.shape[0] < 20:
         visualize(points=points, cluster_labels=hdb_labels, minPts=min_pts, distance="dc_dist", centers=centers, save=save_visualization, save_name=image_save_name)
         #HDBSCAN dc-tree labellings:
-        plot_tree(root, hdb_new_labels, None, save=save_visualization, save_name=image_save_name)
-        plot_tree(root, hdb_labels, None, save=save_visualization, save_name=image_save_name)
+        #plot_tree(root, hdb_new_labels, None, save=save_visualization, save_name=image_save_name)
+        #plot_tree(root, hdb_labels, None, save=save_visualization, save_name=image_save_name)
 
 
         #K-median dc-tree labellings:
+        #root.dist = 500
         plot_tree(root, kmedian_labels, None, save=save_visualization, save_name=image_save_name)
 
         #Plot the dc-tree, optionally with the centers from the final kmeans clusters marked in red

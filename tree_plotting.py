@@ -36,7 +36,7 @@ def make_node_lists(root, point_labels, parent_count, dist_list, edge_list, colo
     if root.dist > 0:
         dist_list.append(root.dist)
     else: 
-        dist_list.append(root.point_id)
+        dist_list.append(root.point_id+1)
     if root.is_leaf:
         color_list.append(point_labels[root.point_id])
         alpha_list.append(1)
@@ -104,7 +104,7 @@ def plot_tree(root, labels, centers=None, save=False, save_name=None):
     for i, node in enumerate(G.nodes):
         pos_dict[node] = pos_list[i]
         #+1 for {:.0f} as these are the node numbers which are 0 indexed from the point_ids in the tree, but are 1-indexed in the other visualizations.
-        dist_dict[node] = '{:.2f}'.format(dist_list[i]) if dist_list[i] % 1 != 0 else '{:.0f}'.format(dist_list[i]+1)
+        dist_dict[node] = '{:.2f}'.format(dist_list[i]) if dist_list[i] % 1 != 0 else '{:.0f}'.format(dist_list[i])
 
     
     plt.title("dc-distance tree with n=" + str(len(labels)))

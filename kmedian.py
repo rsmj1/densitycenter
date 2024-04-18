@@ -1,6 +1,6 @@
 import efficientdcdist.dctree as dcdist
 import numpy as np
-
+import heapq
 
 class DCKMedian(object):
 
@@ -88,13 +88,47 @@ class DCKMedian(object):
      '''
      Solves the K-median problem optimally with complexity O(n * log(n)).
      It does so by greedily choosing the next center as the point that reduces the cost the most. 
+     
+     This is the approach that sorts a list.
+
+     The other approach would use heapq. 
      '''
+     n = points.shape[0]
+     dc_tree = dcdist.DCTree(points, min_points=self.min_pts, n_jobs=1)
+     annotations = self.annotate_tree(dc_tree)
+
+     annotations.sort(reverse=True, key=lambda x : x[0]) #Sort by the first value of the tuples - the potential cost-decrease. Reverse=True to get descending order.
+     cluster_centers = set() # We should not use the "in" operation, as it is a worst-case O(n) operation. Just add again and again
+
+     for annotation in annotations:
+        if len(cluster_centers) >= self.k:
+           break
+        cluster_centers.add(annotation)
+     # Now we just need to assign the points to the clusters.
+
      return
   
   def annotate_tree(self, tree):
      '''
-     Does bottom-up on the dc-tree, generating an array 
+     Does bottom-up on the dc-tree, generating an array of the annotations. We do not need to keep track of which tree-node generated which annotation
+     , so the order in which they are inserted into the array does not matter. 
+     Appending to a list is amortized O(n)
      '''
+
+     output = []
+     def annotation_builder(tree, array, parent_dist):
+        if tree.is_leaf:
+          array.append((parent_dist, tree.point_id))
+          return
+        else:
+           if parent_dist is None:
+              #We are in the root
+              #Here the cost decrease is just infinite, and we return the best of the two centers.
+
+              return
+
+           else:
+              return
      return
   
 #Basic testing:
