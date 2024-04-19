@@ -107,10 +107,20 @@ class DCKMedian(object):
 
 
 
-  def label_points_tuples(self, points, dc_tree):
-     
+  def label_points_tuples(self, dc_tree):
+     output = []
 
-     return #List of tuples
+     def list_builder(dc_tree, list, center):
+        if dc_tree.is_leaf:
+           list.append((dc_tree.point_id, center))
+        else:
+           if dc_tree.chosen:
+              center = dc_tree.best_center
+           list_builder(dc_tree.left_tree, list, center)
+           list_builder(dc_tree.right_tree, list, center)
+
+     list_builder(dc_tree, output)
+     return output #List of tuples
 
   def efficient_greedy(self, points):
      '''
