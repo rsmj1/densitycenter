@@ -84,6 +84,34 @@ class DCKMedian(object):
     #print("cluster_assignments:", cluster_assignments)
     return cluster_assignments
 
+  def assign_points_eff(self, points, centers, dc_tree):
+    '''
+    Assigns the points bottom up to the provided centers in O(n).
+    It starts by annotating the tree with the centers.
+    It then bottom up creates a list of tuples of the point and its center. 
+    Finally, this list is rearranged into the standard format of labelling.
+    It resolves distance ties to the leftmost center in the subtree as an arbitrary choice.
+    '''
+    n = points.shape[0]
+    self.mark_center_paths(centers, dc_tree)
+
+    tuple_list = self.label_points_tuples(points, dc_tree)
+
+    labels = np.zeros(n)
+    for tup in tuple_list:
+       i = tup[0]
+       label = tup[1]
+       labels[i] = label
+        
+    return labels
+
+
+
+  def label_points_tuples(self, points, dc_tree):
+     
+
+     return #List of tuples
+
   def efficient_greedy(self, points):
      '''
      Solves the K-median problem optimally with complexity O(n * log(n)).
@@ -101,14 +129,19 @@ class DCKMedian(object):
      cluster_centers = set() # We should not use the "in" operation, as it is a worst-case O(n) operation. Just add again and again
 
      for annotation in annotations:
-        if len(cluster_centers) >= self.k:
+        curr_len = len(cluster_centers)
+        if curr_len >= self.k:
            break
-        cluster_centers.add(annotation)
+        cluster_centers.add(annotation[1])
+        new_len = len(cluster_centers)
+        if curr_len != new_len: #This janky setup is to make sure we do not need to use the "in" operation which has a worst-case O(n) complexity
+           annotation[2].chosen = True
+           annotation[2].best_center = annotation[1] 
      # Now we just need to assign the points to the clusters.
 
      return
   
-  def annotate_tree(self, tree):
+  def annotate_tree(self, tree): #This is the cost_computation algorithm
      '''
      Does bottom-up on the dc-tree, generating an array of the annotations. We do not need to keep track of which tree-node generated which annotation
      , so the order in which they are inserted into the array does not matter. 
@@ -118,18 +151,28 @@ class DCKMedian(object):
      output = []
      def annotation_builder(tree, array, parent_dist):
         if tree.is_leaf:
-          array.append((parent_dist, tree.point_id))
-          return
+          array.append((parent_dist, tree.point_id, tree)) #Need to append a pointer to the tree itself because we want to mark the spots in the tree form which a point was chosen.
+          return 0, tree.point_id, 1 #Returns local cost, the center for that cost and the size of the tree
         else:
-           if parent_dist is None:
-              #We are in the root
-              #Here the cost decrease is just infinite, and we return the best of the two centers.
+           left_cost, left_center, left_size = annotation_builder(tree.left_tree, tree.dist)
+           right_cost, right_center, right_size =  annotation_builder(tree.right_tree, tree.dist)
+           total_size = left_size + right_size
 
-              return
+           cost_left_center = left_cost + right_size * tree.dist
+           cost_right_center = right_cost + left_size * tree.dist
 
+          #We do not need to keep track of whether we are in the root.
+           if cost_left_center > cost_right_center: #C_L > C_R implies higher decrease for C_R
+              cost_decrease = parent_dist* total_size - cost_right_center 
+              array.append((cost_decrease, right_center, total_size))
+              return cost_right_center, right_center, total_size
            else:
-              return
-     return
+              cost_decrease = parent_dist* total_size - cost_left_center 
+              array.append((cost_decrease, left_center, total_size))
+              return cost_left_center, left_center, total_size
+     annotation_builder(tree, output, np.inf)
+     print("output after the call:", output)
+     return output
   
 #Basic testing:
 #points = np.array([[1,6],[2,6],[6,2],[14,17],[123,3246],[52,8323],[265,73]])

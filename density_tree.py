@@ -15,6 +15,12 @@ class DensityTree:
         self.label = None
         self.point_id = None
 
+        #For efficient greedy
+        self.best_center = None
+        self.cost_decrease = None
+        self.chosen = False
+        #--------------------
+
         if orig_node is not None:
             self.orig_node = orig_node
         else:
