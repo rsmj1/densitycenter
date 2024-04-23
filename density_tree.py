@@ -19,6 +19,10 @@ class DensityTree:
         self.best_center = None
         self.cost_decrease = None
         self.chosen = False
+
+        #For pruning
+        self.num_centers = 0
+        self.center_path = False
         #--------------------
 
         if orig_node is not None:

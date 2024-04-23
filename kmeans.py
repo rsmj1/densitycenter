@@ -1,5 +1,6 @@
 import efficientdcdist.dctree as dcdist
 import numpy as np
+from density_tree import make_tree
 
 
 class DCKMeans(object):
@@ -24,7 +25,8 @@ class DCKMeans(object):
     elif self.method == "naive":
       self.naive_dc_kmeans(points, self.min_pts)
     elif self.method == "optimal":
-       self.solve(points, self.min_pts)
+       #self.solve(points, self.min_pts)
+       self.efficient_greedy(points)
 
 
 

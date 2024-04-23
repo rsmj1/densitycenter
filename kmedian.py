@@ -105,6 +105,36 @@ class DCKMedian(object):
     labels = normalize_cluster_ordering(labels) #THIS STEP IS NOT O(n) DUE TO USING SET IN 
     return labels
 
+  def assign_points_prune(self, points, dc_tree, centers):#inefficient implementation
+     if dc_tree.is_leaf:
+        if dc_tree.point_id in centers:
+           return 
+        return
+     else:
+        
+        return
+        
+
+  def mark_paths(self, dc_tree, centers):
+     '''
+     Inefficient implementation - it is n^2
+     This marks in the tree the paths from the centers and how many centers are on overlapping paths.
+     '''
+     if dc_tree.is_leaf:
+        if dc_tree.point_id in centers:
+           dc_tree.center_path = True
+           dc_tree.num_centers = 1
+           return {dc_tree.point_id}
+        return {}
+     else:
+        left_path = self.mark_paths(dc_tree.left_tree, centers)
+        right_path = self.mark_paths(dc_tree.right_tree, centers)
+        union_path = left_path.union(right_path)
+        num_centers = len(union_path)
+        if num_centers > 0:
+           dc_tree.center_path = True
+           dc_tree.num_centers = num_centers
+        return union_path
 
 
   def label_points_tuples(self, dc_tree):
@@ -144,6 +174,8 @@ class DCKMedian(object):
      placeholder = np.zeros(n)
      dc_tree, _ = make_tree(points, placeholder, min_points=self.min_pts, )
      annotations = self.annotate_tree(dc_tree)
+
+     annotations = self.prune_annotations(annotations)
 
      annotations.sort(reverse=True, key=lambda x : x[0]) #Sort by the first value of the tuples - the potential cost-decrease. Reverse=True to get descending order.
      cluster_centers = set() # We should not use the "in" operation, as it is a worst-case O(n) operation. Just add again and again
@@ -214,6 +246,47 @@ class DCKMedian(object):
             #print("right:", self.get_tree_size(dc_tree.right_tree))
             return self.get_leaves(dc_tree.left_tree) + self.get_leaves(dc_tree.right_tree)
   
+
+  def prune_tree(self, dc_tree):
+     '''
+     Two stages of pruning:
+     1. Ensuring that noise-points cannot be chosen as a cluster-center. 
+     2. Ensuring that noise points are not included in the assignment to the clusters after the centers have been chosen. 
+     '''
+     return
+  
+  def prune_annotations(self, annotations):
+     '''
+     This removes any centers that only have a path of length 1 before another center trumps it in cost-decrease.
+     It returns the pruned list of annotations.
+     '''
+
+     annotations.sort(reverse=True, key=lambda x : x[1]) #Sort by the centers
+
+     to_remove = set()
+     print("annotations:", [annotation[1] for annotation in annotations])
+     curr_center = annotations[0][1]
+     ctr = 0
+     for annotation in annotations[1:]:
+        new_center = annotation[1]
+        if new_center != curr_center and ctr == 0:
+           to_remove.add(curr_center)
+           print("removed", curr_center)
+           curr_center = new_center
+        elif new_center != curr_center:
+           curr_center = new_center
+           ctr = 0
+        else:
+           ctr += 1
+     if ctr == 0:
+        print("removed", curr_center)
+        to_remove.add(curr_center)
+     new_annotations = [annotation for annotation in annotations if annotation[1] not in to_remove]
+     print("annotations:", [annotation[1] for annotation in new_annotations])
+
+     return new_annotations
+
+
 
 
 
