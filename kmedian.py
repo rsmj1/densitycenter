@@ -105,39 +105,7 @@ class DCKMedian(object):
     labels = normalize_cluster_ordering(labels) #THIS STEP IS NOT O(n) DUE TO USING SET IN 
     return labels
 
-  def assign_points_prune(self, points, dc_tree, centers):#inefficient implementation
-     if dc_tree.is_leaf:
-        if dc_tree.point_id in centers:
-           return 
-        return
-     else:
-        
-        return
-        
-
-  def mark_paths(self, dc_tree, centers):
-     '''
-     Inefficient implementation - it is n^2
-     This marks in the tree the paths from the centers and how many centers are on overlapping paths.
-     '''
-     if dc_tree.is_leaf:
-        if dc_tree.point_id in centers:
-           dc_tree.center_path = True
-           dc_tree.num_centers = 1
-           return {dc_tree.point_id}
-        return {}
-     else:
-        left_path = self.mark_paths(dc_tree.left_tree, centers)
-        right_path = self.mark_paths(dc_tree.right_tree, centers)
-        union_path = left_path.union(right_path)
-        num_centers = len(union_path)
-        if num_centers > 0:
-           dc_tree.center_path = True
-           dc_tree.num_centers = num_centers
-        return union_path
-
-
-  def label_points_tuples(self, dc_tree):
+  def label_points_tuples(self, points, dc_tree):
      '''
      This labels the points and outputs a list of tuples of the point_id and the center it is assigned to. 
      It is done this way to avoid having to use a global list. 
@@ -159,7 +127,86 @@ class DCKMedian(object):
            list_builder(dc_tree.right_tree, list, center)
 
      list_builder(dc_tree, output, -1)
+
+
      return output #List of tuples
+
+  def assign_points_prune(self, points, dc_tree):
+     '''
+     This method assigns all points that have the same distance to multiple centers to noise.
+     '''
+     output = []
+
+     def list_builder(dc_tree, list):
+        '''
+        Inefficient implementation for now - proof of concept.
+        Helper method that does the recursive list building. 
+        '''
+        if dc_tree.is_leaf:
+            if dc_tree.center_path:
+              print("here2")
+
+              list.append((dc_tree.point_id, dc_tree.unique_center))
+              return []
+            else:
+               return [dc_tree.point_id]
+        else:
+            left_not_assigned = list_builder(dc_tree.left_tree, list)
+            right_not_assigned = list_builder(dc_tree.right_tree, list)
+
+            all_not_assigned = left_not_assigned + right_not_assigned
+            if dc_tree.center_path: #On center path they should be assigned
+               print("here1")
+               if dc_tree.num_centers == 1:
+                  for p in all_not_assigned:
+                     list.append((p, dc_tree.unique_center))
+               else: #Not uniquely close to one center
+                  for p in all_not_assigned:
+                     list.append((p, -1))
+               return []
+            else: #Not on center path - cannnot be assigned yet
+               return all_not_assigned
+
+
+     list_builder(dc_tree, output)
+     print("output:", output)
+     n = points.shape[0]
+
+     labels = np.zeros(n)
+     for tup in output:
+      i = tup[0]
+      label = tup[1]
+      labels[i] = label
+     labels = normalize_cluster_ordering(labels) #THIS STEP IS NOT O(n) DUE TO USING SET IN 
+     print("labels:", labels)
+     return labels
+        
+
+  def mark_paths(self, dc_tree, centers):
+     '''
+     Inefficient implementation - it is n^2
+     This marks in the tree the paths from the centers and how many centers are on overlapping paths.
+     '''
+     if dc_tree.is_leaf:
+        if dc_tree.point_id in centers:
+           dc_tree.center_path = True
+           dc_tree.num_centers = 1
+           dc_tree.unique_center = dc_tree.point_id
+           return [dc_tree.point_id]
+        return []
+     else:
+        left_path = self.mark_paths(dc_tree.left_tree, centers)
+        right_path = self.mark_paths(dc_tree.right_tree, centers)
+        union_path = left_path + right_path
+        num_centers = len(union_path)
+        if num_centers > 0:
+           dc_tree.center_path = True
+           dc_tree.num_centers = num_centers
+           dc_tree.unique_center = union_path[0]
+        return union_path
+
+
+  
 
   def efficient_greedy(self, points):
      '''
@@ -175,10 +222,11 @@ class DCKMedian(object):
      dc_tree, _ = make_tree(points, placeholder, min_points=self.min_pts, )
      annotations = self.annotate_tree(dc_tree)
 
+     #This is to avoid picking noise points as centers
      annotations = self.prune_annotations(annotations)
 
      annotations.sort(reverse=True, key=lambda x : x[0]) #Sort by the first value of the tuples - the potential cost-decrease. Reverse=True to get descending order.
-     cluster_centers = set() # We should not use the "in" operation, as it is a worst-case O(n) operation. Just add again and again
+     cluster_centers = set() #We should not use the "in" operation, as it is a worst-case O(n) operation. Just add again and again
 
      for annotation in annotations:
         curr_len = len(cluster_centers)
@@ -189,10 +237,15 @@ class DCKMedian(object):
         if curr_len != new_len: #This janky setup is to make sure we do not need to use the "in" operation which has a worst-case O(n) complexity
            annotation[2].chosen = True
            annotation[2].best_center = annotation[1] 
-     # Now we just need to assign the points to the clusters.
-     self.labels_ = self.assign_points_eff(points, dc_tree)
-     print("labels:", self.labels_)
+     #Now we just need to assign the points to the clusters.
+     #self.labels_ = self.assign_points_eff(points, dc_tree)
+     
      centers = list(cluster_centers)
+
+
+     self.mark_paths(dc_tree, centers)
+     self.labels_ = self.assign_points_prune(points, dc_tree)
+     print("labels:", self.labels_)
      self.center_indexes = centers
      self.centers = points[centers]
      return

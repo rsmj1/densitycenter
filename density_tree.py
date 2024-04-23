@@ -23,6 +23,7 @@ class DensityTree:
         #For pruning
         self.num_centers = 0
         self.center_path = False
+        self.unique_center = None
         #--------------------
 
         if orig_node is not None:
