@@ -36,7 +36,7 @@ if __name__ == '__main__':
     #################### RUN PARAMETERS HERE #######################
 
     num_points = 50
-    k = 3
+    k = 5
     min_pts = 3
     mcs = 2
 
@@ -113,26 +113,26 @@ if __name__ == '__main__':
 
 
 
-    points = np.array([[1,2],
-                       [1,4],
-                       [2,3],
-                       [1,1],
-                       [-5,15], #5
-                       [11,13],
-                       [13,11],
-                       [10,8],
-                       [14,13],
-                       [16,17], #10
-                       [18,19],
-                       [19,18],
-                       [21,24],
-                       [11,17],
-                       [28,21], #15
-                       [10,18],
-                       [7,7]
-                       ]
-                       )
-    labels = np.array([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16])
+    # points = np.array([[1,2],
+    #                    [1,4],
+    #                    [2,3],
+    #                    [1,1],
+    #                    [-5,15], #5
+    #                    [11,13],
+    #                    [13,11],
+    #                    [10,8],
+    #                    [14,13],
+    #                    [16,17], #10
+    #                    [18,19],
+    #                    [19,18],
+    #                    [21,24],
+    #                    [11,17],
+    #                    [28,21], #15
+    #                    [10,18],
+    #                    [7,7]
+    #                    ]
+    #                    )
+    # labels = np.array([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16])
 
 
     root, dc_dists = make_tree(
@@ -145,7 +145,7 @@ if __name__ == '__main__':
 
     
     #K-center
-    pred_labels, kcenter_centers, epsilons = dc_clustering(root, num_points=len(labels), k=k, min_points=min_pts,with_noise=False)
+    pred_labels, kcenter_centers, epsilons = dc_clustering(root, num_points=len(labels), k=k, min_points=min_pts,with_noise=True)
 
     #print("Pred labels:", pred_labels)
 

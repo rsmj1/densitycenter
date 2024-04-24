@@ -134,6 +134,10 @@ class DCKMedian(object):
   def assign_points_prune(self, points, dc_tree):
      '''
      This method assigns all points that have the same distance to multiple centers to noise.
+
+
+     Thought TODO: If we prune the tree and smooth out (remove internal nodes where no left/right child is left), then feasibly one could run K-median on it. 
+     This might be equivalent to the pruning of the output list of annotations(?)
      '''
      output = []
 
@@ -206,7 +210,12 @@ class DCKMedian(object):
         return union_path
 
 
-  
+  def assign_points_prune_v2(self, points, dc_tree, min_pts):
+     '''
+     This method will both assign points that are equidistant to two clusters and branch-off points to noise. 
+     #TODO: Need to understand how this should work in the first place...
+     '''
+     return
 
   def efficient_greedy(self, points):
      '''

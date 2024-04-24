@@ -151,7 +151,14 @@ class HDBSCAN(object):
 
                 left_clusters, left_stability, left_last_clustering = self.compute_clustering(dc_tree.left_tree, cdists, dc_tree.dist)
                 right_clusters, right_stability, right_last_clustering = self.compute_clustering(dc_tree.right_tree, cdists, dc_tree.dist)
+                    
+                var,bar,dsize,ssize = self.cluster_stability_experimental(dc_tree)
 
+                print("node dist: ", np.round(dc_tree.dist,2), "size", len(self.get_leaves(dc_tree)))
+                print("w/ var:", var,"bar", bar,"dists_size", dsize,"set_size", ssize)
+                print("stability:", ssize/(1+var))
+                print("")
+                
                 if parent_dist is None: #Root call has no parent_dist.
                     if not self.allow_single_cluster:
                         if len(left_clusters + right_clusters) == 1:
@@ -172,12 +179,15 @@ class HDBSCAN(object):
                     all_clusters = left_clusters + right_clusters #append the clusters together, as there is no noise in either branch
                     new_stability = self.cluster_stability(dc_tree, parent_dist, tree_size, cdists)
                     #TODO: I need to gather together all the noise at the same distance, as they might constitute a cluster.... 
+                    
                     # print("nodes: ", np.array(self.get_leaves(dc_tree))+1)
                     # print("old below sum stability:", total_stability)
                     # print("left, right:", left_stability, right_stability)
                     # print("Own dist:", dc_tree.dist)
                     # print("parent_dist:", parent_dist)
                     # print("new stability:", new_stability)
+
+
                     
                     if new_stability >= total_stability: #Should be bigger than or equal to encompass that we get all the noise points added every time.
                             return [dc_tree], new_stability, left_last_clustering + right_last_clustering
@@ -187,6 +197,48 @@ class HDBSCAN(object):
                             else: 
                                 return all_clusters, total_stability, all_clusters 
 
+
+    def cluster_stability_experimental(self, dc_tree):
+        '''
+        Computes |C|/Var(D_C)
+        Currently just blindly bottom up to check values.
+        '''
+        if dc_tree.is_leaf:
+            return 0,0,0,1 #return var, bar, num_pairwise_dists, num_points
+        else:
+            lvar, lbar, l_dists_size, l_set_size = self.cluster_stability_experimental(dc_tree.left_tree)
+            rvar, rbar, r_dists_size, r_set_size = self.cluster_stability_experimental(dc_tree.right_tree)
+
+            new_set_size = l_set_size + r_set_size #The amount of points in the combined subtree
+            
+            new_var, new_bar, new_dists_size = self.merge_subtree_variance(dc_tree.dist, l_dists_size, r_dists_size, lvar, rvar, lbar, rbar, l_set_size, r_set_size)
+            return new_var, new_bar, new_dists_size, new_set_size
+        
+ 
+    def combined_variance(self, n,m,xvar,yvar,xbar,ybar):
+        '''
+        https://stats.stackexchange.com/questions/557469/difference-between-pooled-variance-and-combined-variance
+
+        Returns the combined size, combined mean and combined variance
+        '''
+        nc = n+m
+        xc = self.combined_mean(n,m,xbar,ybar)
+        vc = (n*(xvar+(xbar-xc)**2)+m*(yvar+(ybar-xc)**2))/(nc)
+        return vc, xc, nc
+
+    def combined_mean(self, n,m,xbar,ybar):
+        return (xbar*n+ybar*m)/(n+m)
+    
+    def merge_subtree_variance(self, dist,  l_dists_size, r_dists_size, lvar, rvar, lbar, rbar, lsetsize, rsetsize):
+        if l_dists_size + r_dists_size != 0: 
+            sub_var, sub_bar, sub_size = self.combined_variance(l_dists_size, r_dists_size, lvar, rvar, lbar, rbar)
+            
+            new_dists_size = lsetsize*rsetsize
+            merge_var, merge_bar, merge_dists_size = self.combined_variance(sub_size, new_dists_size, sub_var, 0, sub_bar, dist)
+        else: #If no dists in either distribution so far (coming from leaves)
+            merge_var, merge_bar, merge_dists_size = 0, dist, 1
+
+        return merge_var, merge_bar, merge_dists_size
 
 
     def cluster_stability(self, dc_tree, parent_dist, tree_size, cdists):
