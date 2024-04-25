@@ -45,9 +45,9 @@ if __name__ == '__main__':
     eps = 2
     dataset_type = "moon" 
     save_dataset = False
-    load_dataset = False #If true will override the other params and just load from the filename.
-    save_name = "debug1" #Shared for name of images, filename to save the dataset into
-    load_name = "debug1"
+    load_dataset = True #If true will override the other params and just load from the filename.
+    save_name = "debugstability" #Shared for name of images, filename to save the dataset into
+    load_name = "debugstability"
 
     #visualization parameters - comment in or out the visualization tools in the section below
     save_visualization = False
@@ -91,7 +91,6 @@ if __name__ == '__main__':
                        )
     labels = np.array([0,1,2,3,4,5,6,7,8,9,10,11])
 
-    #points, labels = create_dataset(num_points=num_points, type=dataset_type, save=save_dataset, load=load_dataset, save_name=save_name, load_name=load_name)
 
     #Interesting example with min_pts = 3, mcs = 2 - shows a potential bug for sklearn HDBSCAN.
     # points = np.array([[1,2],
@@ -113,26 +112,27 @@ if __name__ == '__main__':
 
 
 
-    # points = np.array([[1,2],
-    #                    [1,4],
-    #                    [2,3],
-    #                    [1,1],
-    #                    [-5,15], #5
-    #                    [11,13],
-    #                    [13,11],
-    #                    [10,8],
-    #                    [14,13],
-    #                    [16,17], #10
-    #                    [18,19],
-    #                    [19,18],
-    #                    [21,24],
-    #                    [11,17],
-    #                    [28,21], #15
-    #                    [10,18],
-    #                    [7,7]
-    #                    ]
-    #                    )
-    # labels = np.array([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16])
+    points = np.array([[1,2],
+                       [1,4],
+                       [2,3],
+                       [1,1],
+                       [-5,15], #5
+                       [11,13],
+                       [13,11],
+                       [10,8],
+                       [14,13],
+                       [16,17], #10
+                       [18,19],
+                       [19,18],
+                       [21,24],
+                       [11,17],
+                       [28,21], #15
+                       [10,18],
+                       [7,7]
+                       ]
+                       )
+    labels = np.array([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16])
+    #points, labels = create_dataset(num_points=num_points, type=dataset_type, save=save_dataset, load=load_dataset, save_name=save_name, load_name=load_name)
 
 
     root, dc_dists = make_tree(
@@ -217,8 +217,8 @@ if __name__ == '__main__':
     if points.shape[0] < 100:
         #visualize(points=points, cluster_labels=hdb_labels, minPts=min_pts, distance="dc_dist", centers=centers, save=save_visualization, save_name=image_save_name)
         #HDBSCAN dc-tree labellings:
-        #plot_tree(root, hdb_new_labels, None, save=save_visualization, save_name=image_save_name)
-        #plot_tree(root, hdb_labels, None, save=save_visualization, save_name=image_save_name)
+        # plot_tree(root, hdb_new_labels, None, save=save_visualization, save_name=image_save_name)
+        # plot_tree(root, hdb_labels, None, save=save_visualization, save_name=image_save_name)
 
 
         #K-median dc-tree labellings:

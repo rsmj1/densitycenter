@@ -153,10 +153,62 @@ class HDBSCAN(object):
                 right_clusters, right_stability, right_last_clustering = self.compute_clustering(dc_tree.right_tree, cdists, dc_tree.dist)
                     
                 var,bar,dsize,ssize = self.cluster_stability_experimental(dc_tree)
-
+                
                 print("node dist: ", np.round(dc_tree.dist,2), "size", len(self.get_leaves(dc_tree)))
+                num_nodes = min(ssize, 5)
+                print("nodes:", np.array(self.get_leaves(dc_tree))[:num_nodes]+1)
                 print("w/ var:", var,"bar", bar,"dists_size", dsize,"set_size", ssize)
-                print("stability:", ssize/(1+var))
+                if var == 0 or bar == 0:
+                    print("stability:", 0)
+                else:
+                    nodes = self.get_leaves(dc_tree)
+                                    
+                    cluster_sum = np.sum(1/cdists[nodes])
+                    # print("cluster_sum:", cluster_sum)
+                    # print("stability:", cluster_sum/(var))
+
+
+                    
+                    # print("")
+                    max_cdist = np.max(cdists)
+                    # print("max_cdist:", max_cdist)
+                    # print("cdists", max_cdist - cdists[nodes])
+                    other_sum = np.sum(max_cdist - cdists[nodes])
+                    print("max_cdist:", max_cdist)
+                    print("custer_sum:", cluster_sum)
+                    print("other_sum:", other_sum)
+                    print("1/var", 1/var)
+                    print("max-var", max_cdist-var)
+                    # print("dc_tree.dist-var", dc_tree.dist - var)
+                    s1 = cluster_sum/(var)
+                    s2 = other_sum * (max_cdist - var)
+                    s3 = len(nodes)/(var/bar)
+                    print("sum(1/cdist_i)/var:", s1)
+                    print("(sum(max-cdist_i))*(max-var):", s2)
+                    print("size / (var/mean):", s3)
+
+                    if dc_tree.parent is not None:
+                        pvar,pbar,pdsize,pssize = self.cluster_stability_experimental(dc_tree.parent)
+                        p_nodes = self.get_leaves(dc_tree.parent)
+                        p_cluster_sum = np.sum(1/cdists[p_nodes])
+                        p_other_sum = np.sum(max_cdist - cdists[p_nodes])
+
+                        p_s1 = p_cluster_sum/(pvar)
+                        p_s2 = p_other_sum * (max_cdist - pvar)
+                        p_s3 = len(p_nodes) /(pvar/pbar)
+                        print("")
+                        print("If positive, then child bigger than parent, so bigger is better, negative is bad")
+                        print("s1d:", s1-p_s1)
+                        print("s2d:", s2-p_s2)
+                        print("s3d:", s3-p_s3)
+
+
+
+                    print("")
+
+                    
+
+
                 print("")
                 
                 if parent_dist is None: #Root call has no parent_dist.
@@ -177,7 +229,10 @@ class HDBSCAN(object):
                 else:
                     total_stability = left_stability + right_stability 
                     all_clusters = left_clusters + right_clusters #append the clusters together, as there is no noise in either branch
-                    new_stability = self.cluster_stability(dc_tree, parent_dist, tree_size, cdists)
+                    new_stability = self.cluster_stability(dc_tree, parent_dist, tree_size, cdists) #This is the real stability.
+                    
+                    
+
                     #TODO: I need to gather together all the noise at the same distance, as they might constitute a cluster.... 
                     
                     # print("nodes: ", np.array(self.get_leaves(dc_tree))+1)
