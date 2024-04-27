@@ -1,6 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.datasets import make_swiss_roll, make_moons
+from sklearn.datasets import load_iris
+
 from sklearn.manifold import MDS
 from sklearn.metrics import normalized_mutual_info_score as nmi
 from sklearn.decomposition import PCA
@@ -135,6 +137,7 @@ if __name__ == '__main__':
     #points, labels = create_dataset(num_points=num_points, type=dataset_type, save=save_dataset, load=load_dataset, save_name=save_name, load_name=load_name)
 
 
+
     root, dc_dists = make_tree(
     points,
     labels,
@@ -211,6 +214,11 @@ if __name__ == '__main__':
     print("equal if zero:", np.count_nonzero(normalize_cluster_ordering(hdb_labels) -normalize_cluster_ordering(hdb_new_labels)) )
     print("New:", normalize_cluster_ordering(hdb_new_labels))
     print("Old:", normalize_cluster_ordering(hdb_labels))
+
+
+    # test = load_iris()
+    # print("test:", test)
+
 
     ################################### RESULTS VISUALIZATION #####################################
     #Plot the complete graph from the dataset with the specified distance measure on all of the edges. Optionally show the distances in embedded space with MDS.

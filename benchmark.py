@@ -1,16 +1,22 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.datasets import make_swiss_roll, make_moons
+from sklearn.datasets import make_swiss_roll, make_moons, make_blobs, make_gaussian_quantiles, make_friedman1, make_classification, make_regression, make_s_curve
+from sklearn.datasets import make_circles as make_circles_sklearn
 from sklearn.manifold import MDS
 from sklearn.cluster import SpectralClustering
 from DBSCAN import DBSCAN
 from sklearn.metrics import normalized_mutual_info_score as nmi
+from sklearn.metrics import adjusted_rand_score as ari
+from sklearn.metrics import adjusted_mutual_info_score as ami
 from sklearn.decomposition import PCA
 import networkx as nx
 from datetime import datetime
 #import hdbscan
+import os, csv, glob
 
 from experiment_utils.get_data import get_dataset, make_circles
+
+
 from distance_metric import get_dc_dist_matrix
 from density_tree import make_tree
 from tree_plotting import plot_embedding
@@ -36,7 +42,7 @@ warnings.filterwarnings('ignore')
 
 
 
-def create_dataset(num_points, type, save=False, load=False, save_name=None, load_name=None, num_classes=6, k=4):
+def create_dataset(num_points, type, save=False, load=False, save_name=None, load_name=None, num_classes=6, k=4, num_features=2, noise=0.1):
     """
     Parameters
     ----------
@@ -69,8 +75,11 @@ def create_dataset(num_points, type, save=False, load=False, save_name=None, loa
         labels = np.loadtxt("savefiles/datasets/"+load_name+'_labels.csv', delimiter=',')
         print("Loaded file \"" + load_name + "\", with "+ str(points.shape[0]) + " points.")
     else: 
+        ##### Synthetic datasets #####
+
         if type == "moon":
-            points, labels = make_moons(n_samples=num_points, noise=0.1)
+            #Creates two half-moons in a "yin-yang" shape
+            points, labels = make_moons(n_samples=num_points, noise=noise)
         elif type == "gauss":
             #This does not have ground truth labels, so just use sklearn kmeans over euclidean distance as "ground truth"
             points = create_hierarchical_clusters(n=num_points, unique_vals=True)
@@ -78,22 +87,91 @@ def create_dataset(num_points, type, save=False, load=False, save_name=None, loa
             euclid_kmeans.fit(points)
             labels = euclid_kmeans.labels_
         elif type == "circle":
-            points, labels = make_circles(n_samples=num_points, noise=0.01, radii=[0.5, 1.0], thicknesses=[0.1, 0.1])
+            #Generates circles - with given thicknesses and radii. This is a "homebrewed method"
+            points, labels = make_circles(n_samples=num_points, noise=noise, radii=[0.5, 1.0], thicknesses=[0.1, 0.1])
+        elif type == "con_circles":
+            #Generates two circles within each other (concentric circles) - 2d circles
+            points, labels = make_circles_sklearn(n_samples=num_points, noise=noise)
+        elif type == "blobs":
+            #The cluster_std is the density of each blob essentially.
+            points, labels = make_blobs(n_samples=num_points, centers=5, cluster_std=[1.0, 2.0, 3.0, 4.0, 2.5])
+        elif type == "gauss_quantiles":
+            points, labels = make_gaussian_quantiles(n_samples=num_points, n_features=num_features, n_classes=num_classes, cov=2.0)
+        elif type == "swiss_rolls":
+            #Literally creates a "roll" of the points in 3d - 3 features for each point.
+            points, labels = make_swiss_roll(n_samples=num_points, noise=noise)
+        elif type == "s_curve":
+            #Outputs 3d points in an s-curve shape.
+            points, labels = make_s_curve(n_samples=num_points, noise=noise)
+        elif type == "friedman":
+            #Has at least 5 features and generates points from random vectors with each entry in [0,1] transformed via: 10 * sin(pi * X[:, 0] * X[:, 1]) + 20 * (X[:, 2] - 0.5) ** 2 + 10 * X[:, 3] + 5 * X[:, 4] + noise * N(0, 1).
+            #The rest of the features are not transformed.
+            if num_features < 5:
+                points, labels = make_friedman1(n_samples=num_points, n_features=5, noise=noise)
+            else:
+                points, labels = make_friedman1(n_samples=num_points, n_features=num_features, noise=noise)
+        elif type == "classification":
+            #n_informative is relative to n_features the amount of the features that actually help in the classification
+            points, labels = make_classification(n_samples=num_points, n_features=num_features, n_informative=num_features//2, n_classes=num_classes)
+        elif type == "regression":
+            #A regression problem, similar thought process to classification above.
+            points, labels = make_regression(n_samples=num_points, n_features=num_features, n_informative=num_features//2, n_classes=num_classes)
+
+        #Datasets from https://cs.joensuu.fi/sipu/datasets/
+        elif type == "compound":
+
+            points, labels = load_txt_datasets("compound")
+        elif type == "worms":
+            points, _ = load_txt_datasets("worms_2d")
+            euclid_kmeans = KMeans(n_clusters=k)
+            euclid_kmeans.fit(points)
+            labels = euclid_kmeans.labels_
+
+        elif type == "aggregate":
+            points, labels = load_txt_datasets("aggregate")
+                
+        ##### Toy datasets #####
         elif type == "synth":
             points, labels = get_dataset('synth', num_classes=num_classes, points_per_class=(num_points//num_classes))
-        elif type == "coil":
-            points, labels = get_dataset('coil', class_list=np.arange(1, num_classes), points_per_class=(num_points//num_classes))
         elif type == "mnist":
+            #Just loads the mnist dataset, ignoring the other parameters in this call.
             points, labels = get_dataset('mnist', num_classes=num_classes, points_per_class=(num_points//num_classes))
-        
         if save:
             if save_name is None:
                 save_name = str(datetime.now())
             np.savetxt("savefiles/datasets/"+save_name+'.csv', points, delimiter=',')
             np.savetxt("savefiles/datasets/"+save_name+'_labels.csv', labels, delimiter=',')
+
+        ##### Benchmark datasets #####
+        elif type == "coil": 
+            #The coil100 dataset
+            points, labels = get_dataset('coil', class_list=np.arange(1, num_classes), points_per_class=(num_points//num_classes))
         
+
+
     return points, labels
 
+def load_txt_datasets(dataset="compound"):
+    '''
+    Currently only works for 2d points with or without ground truth labels.
+    '''
+    points, labels = [],[]
+
+    data = []
+    path = os.path.join("data", "Synthetic", dataset+".txt")
+
+    with open(path, "r") as data:
+        for point in data:
+            #print("line:", point)
+            dims = point.strip().split()
+
+            if len(dims) == 3:
+                points.append(list(map(float, dims[:-1])))
+                labels.append(int(dims[2]))
+            else:
+                points.append(list(map(float, dims)))
+
+    return np.array(points), np.array(labels)
 
 def normalize_cluster_ordering(cluster_labels):
     '''
@@ -376,13 +454,29 @@ def display_results(results, headers, rundata, dataset_types, metrics):
 def metric_matrix(label_results, metric="nmi"):
     '''
     Creates a matrix of size num_labellings x num_labellings computing the NMI between each. 
+
+    Parameters
+    ----------
+
+    label_results : Array
+        Array of the output clustering labels for each method run on a given dataset. (n x m) where n is the number of algorithms and m is the number of points in the dataset.
+    
+    metric: String, default="nmi"
+        The metric to compare each pair-combination of labels on. 
+        Options: "nmi", "ari", "ami"
+
+    
     '''
     n = label_results.shape[0]
     comparison_matrix = np.zeros((n,n))
     for i, labels1 in enumerate(label_results):
         for j, labels2 in enumerate(label_results):
-            if metric == "nmi":
+            if metric == "nmi": #Normalized mutual information
                 comparison_matrix[i,j] = nmi(labels1, labels2)
+            elif metric == "ari": # Adjusted rand index
+                comparison_matrix[i,j] = ari(labels1, labels2)
+            elif metric == "ami":
+                comparison_matrix[i,j] = ami(labels1, labels2)
             elif metric == "test":
                 comparison_matrix[i,j] = 100
             #Currently should probably just be NMI: It is symmetric. 
@@ -444,6 +538,9 @@ def benchmark_single(points, runtype, k, min_pts, eps):
 
 if __name__ == "__main__":
     #brute_force_comparision(num_points=10, min_pts=3)
-    benchmark(dataset_types=["moon", "gauss", "circle"], num_points=500, num_runs=3, runtypes=["KMEANS","DCKMEANS", "HDBSCAN", "DCKMEANS"], metrics=["nmi", "test"], k=3, min_pts=3, eps=2, save_results=True, visualize_results=True, plot_clusterings=True)
+    points, labels = create_dataset(100, "coil")
+    print("points:", points[:100])
+    print("labels:", labels[:100])
+    #benchmark(dataset_types=["moon", "gauss", "circle"], num_points=500, num_runs=3, runtypes=["KMEANS","DCKMEANS", "HDBSCAN", "DCKMEANS"], metrics=["nmi", "test"], k=3, min_pts=3, eps=2, save_results=True, visualize_results=True, plot_clusterings=True)
 
 

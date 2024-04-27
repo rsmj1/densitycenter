@@ -48,7 +48,7 @@ def load_coil100_data(directory=None):
     Using it requires manually unzipping it into a directory
     """
     if directory is None:
-        directory = os.path.join('data', 'coil-100')
+        directory = os.path.join('data', 'coil-100', 'coil-100')
     pickled_path = os.path.join(directory, 'pickled_coil.npy')
     if os.path.exists(pickled_path):
         dataset = np.load(pickled_path, allow_pickle=True)[()]
@@ -79,7 +79,6 @@ def load_coil100_data(directory=None):
     return points, labels
     
 def load_dsnesynth_data(directory=None):
-
     if directory is None:
         directory = os.path.join('data', 'synth')
     file_path = os.path.join(directory, 'synth_data_10400_5_2_1.npy')

@@ -183,9 +183,12 @@ class HDBSCAN(object):
                     s1 = cluster_sum/(var)
                     s2 = other_sum * (max_cdist - var)
                     s3 = len(nodes)/(var/bar)
+                    s4 = 0
+                    
                     print("sum(1/cdist_i)/var:", s1)
                     print("(sum(max-cdist_i))*(max-var):", s2)
                     print("size / (var/mean):", s3)
+                    print("s4:", s4)
 
                     if dc_tree.parent is not None:
                         pvar,pbar,pdsize,pssize = self.cluster_stability_experimental(dc_tree.parent)
@@ -339,7 +342,7 @@ class HDBSCAN(object):
             return right_size * (1/dc_tree.dist) + self.sub_contribution(dc_tree.left_tree)
         else:
             #Cluster merging
-            #This checks if it is a true split or not!
+            #This checks if it is a true split or not by checking if there are more than noise number of points that aren't just the distance in the current node. 
             real_lsize = left_size - self.count_equidist(dc_tree.left_tree, dc_tree.dist)
             real_rsize = right_size - self.count_equidist(dc_tree.right_tree, dc_tree.dist)
             if real_lsize >= self.min_cluster_size and real_rsize >= self.min_cluster_size:
