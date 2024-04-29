@@ -309,13 +309,9 @@ class DCKMedian(object):
             return self.get_leaves(dc_tree.left_tree) + self.get_leaves(dc_tree.right_tree)
   
 
-  def prune_tree(self, dc_tree):
-     '''
-     Two stages of pruning:
-     1. Ensuring that noise-points cannot be chosen as a cluster-center. 
-     2. Ensuring that noise points are not included in the assignment to the clusters after the centers have been chosen. 
-     '''
-     return
+
+
+
   
   def prune_annotations(self, annotations):
      '''

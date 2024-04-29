@@ -38,20 +38,23 @@ def make_node_lists(root, point_labels, parent_count, dist_list, edge_list, colo
     else: 
         dist_list.append(root.point_id+1)
     if root.is_leaf:
-        color_list.append(point_labels[root.point_id])
-        alpha_list.append(1)
-        if centers is not None:
-            if root.point_id in centers:
-                edgecolor_list.append("red")
-            elif point_labels[root.point_id] != -1:
-                edgecolor_list.append("black")
+        if root.point_id == -2:
+            color_list.append(0)
+        else:
+            color_list.append(point_labels[root.point_id])
+            alpha_list.append(1)
+            if centers is not None:
+                if root.point_id in centers:
+                    edgecolor_list.append("red")
+                elif point_labels[root.point_id] != -1:
+                    edgecolor_list.append("black")
+                else: 
+                    edgecolor_list.append("yellow")
             else: 
-                edgecolor_list.append("yellow")
-        else: 
-            if point_labels[root.point_id] != -1: #Non-noise points
-                edgecolor_list.append("black")
-            else: #Noise points:
-                edgecolor_list.append("yellow")
+                if point_labels[root.point_id] != -1: #Non-noise points
+                    edgecolor_list.append("black")
+                else: #Noise points:
+                    edgecolor_list.append("yellow")
     else:
         color_list.append(-1)
         alpha_list.append(0.5)

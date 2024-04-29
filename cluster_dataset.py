@@ -20,7 +20,7 @@ from point_gen import create_hierarchical_clusters
 from visualization import visualize
 from benchmark import create_dataset
 from benchmark import normalize_cluster_ordering
-
+from cluster_tree import copy_tree, prune_tree
 
 #Algorithms
 from sklearn.cluster import SpectralClustering
@@ -145,7 +145,8 @@ if __name__ == '__main__':
     make_image=plot_tree_bool,
     n_neighbors=n_neighbors
     )
-
+    
+    
     
     #K-center
     pred_labels, kcenter_centers, epsilons = dc_clustering(root, num_points=len(labels), k=k, min_points=min_pts,with_noise=True)
@@ -159,6 +160,8 @@ if __name__ == '__main__':
 
     kmeans_labels = kmeans.labels_
     centers = kmeans.centers
+
+    
 
     print("here!!!")
     #K-median clustering
@@ -216,9 +219,21 @@ if __name__ == '__main__':
     print("Old:", normalize_cluster_ordering(hdb_labels))
 
 
-    # test = load_iris()
-    # print("test:", test)
+    new_root = prune_tree(root, 3)
 
+    def traverse_tree(root, level):
+        if root.is_leaf:
+            print("point:", root.point_id)
+            print("point dist:", root.dist)
+        else:       
+            print("dist:", root.dist)
+        if root.left_tree is not None:
+            print("going left...", level)
+            traverse_tree(root.left_tree, level+1)
+        if root.right_tree is not None:
+            print("going right...", level)
+            traverse_tree(root.right_tree, level+1)
+    #traverse_tree(new_root, 0)
 
     ################################### RESULTS VISUALIZATION #####################################
     #Plot the complete graph from the dataset with the specified distance measure on all of the edges. Optionally show the distances in embedded space with MDS.
@@ -228,6 +243,7 @@ if __name__ == '__main__':
         # plot_tree(root, hdb_new_labels, None, save=save_visualization, save_name=image_save_name)
         # plot_tree(root, hdb_labels, None, save=save_visualization, save_name=image_save_name)
 
+        plot_tree(new_root, labels)
 
         #K-median dc-tree labellings:
         #root.dist = 500

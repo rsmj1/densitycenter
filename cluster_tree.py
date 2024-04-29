@@ -11,6 +11,10 @@ class Cluster:
         return len(self.points)
 
 def copy_tree(root, min_points, pruned_parent=None):
+    '''
+    Returns a copy of the tree with only the non-pruned structure left. 
+    orig_node saves the old node before the modification for reinstating stuff again.
+    '''
     if len(root) >= min_points:
         pruned_root = DensityTree(root.dist, orig_node=root, path=root.path, parent=pruned_parent)
         if root.left_tree is not None:
@@ -21,6 +25,40 @@ def copy_tree(root, min_points, pruned_parent=None):
         return pruned_root
 
     return None
+
+def prune_tree(dc_tree, min_pts, pruned_parent=None):
+    '''
+    Returns a copy of the tree with only the non-pruned structure left. 
+    This version can actually be visualized and be used for k-median. 
+    '''
+    if len(dc_tree) >= min_pts:
+        pruned_root = DensityTree(dc_tree.dist, orig_node=dc_tree, path=dc_tree.path, parent=pruned_parent)
+        if dc_tree.left_tree is not None:
+            pruned_root.set_left_tree(prune_tree(dc_tree.left_tree, min_pts, pruned_root))
+        if dc_tree.right_tree is not None:
+            pruned_root.set_right_tree(prune_tree(dc_tree.right_tree, min_pts, pruned_root))
+        pruned_root.count_children()
+
+        #Now reinstate things for usage and visualization
+        if pruned_root.is_leaf and min_pts > 1: #If leaf - put everything back under it.
+            pruned_root.set_left_tree(dc_tree.left_tree)
+            pruned_root.set_right_tree(dc_tree.right_tree)
+            pruned_root = dc_tree
+            return pruned_root
+
+        if pruned_root.left_tree is None:
+            leaf = DensityTree(0, parent=pruned_root)
+            leaf.point_id = -2
+            pruned_root.set_left_tree(leaf)
+        if pruned_root.right_tree is None:
+            leaf = DensityTree(0, parent=pruned_root)
+            leaf.point_id = -2
+            pruned_root.set_right_tree(leaf)
+
+        return pruned_root
+    
+    return None
+
 
 def get_node(root, path):
     if path == '':
