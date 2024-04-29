@@ -218,22 +218,10 @@ if __name__ == '__main__':
     print("New:", normalize_cluster_ordering(hdb_new_labels))
     print("Old:", normalize_cluster_ordering(hdb_labels))
 
-
+    #Pruning the tree here:
     new_root = prune_tree(root, 3)
 
-    def traverse_tree(root, level):
-        if root.is_leaf:
-            print("point:", root.point_id)
-            print("point dist:", root.dist)
-        else:       
-            print("dist:", root.dist)
-        if root.left_tree is not None:
-            print("going left...", level)
-            traverse_tree(root.left_tree, level+1)
-        if root.right_tree is not None:
-            print("going right...", level)
-            traverse_tree(root.right_tree, level+1)
-    #traverse_tree(new_root, 0)
+    
 
     ################################### RESULTS VISUALIZATION #####################################
     #Plot the complete graph from the dataset with the specified distance measure on all of the edges. Optionally show the distances in embedded space with MDS.

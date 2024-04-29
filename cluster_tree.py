@@ -14,6 +14,36 @@ def copy_tree(root, min_points, pruned_parent=None):
     '''
     Returns a copy of the tree with only the non-pruned structure left. 
     orig_node saves the old node before the modification for reinstating stuff again.
+
+    It prunes by making "none" children from the pruned things, keeping the overalll structure otherwise.
+
+    Example with min_pts = 3: (blue path does not mean anything)
+
+          o
+         / \
+        o   o
+       /     \
+      o       o
+     / \     / \
+    o   o   o   o
+                 \
+                  o
+                 / \
+                o   o
+    
+    Becomes:
+    
+          o
+         / \
+        N   o
+             \
+              o
+             / \
+            N   N
+       
+
+
+
     '''
     if len(root) >= min_points:
         pruned_root = DensityTree(root.dist, orig_node=root, path=root.path, parent=pruned_parent)
@@ -28,9 +58,15 @@ def copy_tree(root, min_points, pruned_parent=None):
 
 def prune_tree(dc_tree, min_pts, pruned_parent=None):
     '''
+    Version mainly used for visualization.
+
     Returns a copy of the tree with only the non-pruned structure left. 
-    This version can actually be visualized and be used for k-median. 
+    Below a cut of noise will be a leaf with a -2 point_id label.
+    For something that becomes a leaf by pruning, the sub-structure under it will be reinstated. 
     '''
+
+    #equidist = count_equidist(dc_tree, dc_tree.dist)
+    #total_size = len(dc_tree) - equidist
     if len(dc_tree) >= min_pts:
         pruned_root = DensityTree(dc_tree.dist, orig_node=dc_tree, path=dc_tree.path, parent=pruned_parent)
         if dc_tree.left_tree is not None:
@@ -47,11 +83,11 @@ def prune_tree(dc_tree, min_pts, pruned_parent=None):
             return pruned_root
 
         if pruned_root.left_tree is None:
-            leaf = DensityTree(0, parent=pruned_root)
-            leaf.point_id = -2
+            leaf = DensityTree(0, parent=pruned_root, orig_node = dc_tree.left_tree) 
+            leaf.point_id = -2 
             pruned_root.set_left_tree(leaf)
         if pruned_root.right_tree is None:
-            leaf = DensityTree(0, parent=pruned_root)
+            leaf = DensityTree(0, parent=pruned_root, orig_node=dc_tree.right_tree)
             leaf.point_id = -2
             pruned_root.set_right_tree(leaf)
 
@@ -59,6 +95,41 @@ def prune_tree(dc_tree, min_pts, pruned_parent=None):
     
     return None
 
+
+def count_equidist(dc_tree, dist):
+    '''
+    Counts the number of points within the given dc_tree that are at the given distance dist.
+    '''
+    if dc_tree.dist != dist:
+        return 0
+    else:
+        lsize = len(dc_tree.left_tree)
+        rsize = len(dc_tree.right_tree)
+        if lsize == 1 and rsize == 1:
+            return 2
+        elif lsize == 1:
+            return 1 + count_equidist(dc_tree.right_tree, dist)
+        elif rsize == 1:
+            return 1 + count_equidist(dc_tree.left_tree, dist)
+        else: 
+            return count_equidist(dc_tree.right_tree, dist) + count_equidist(dc_tree.left_tree, dist) 
+
+
+def traverse_tree(root, level):
+    '''
+    This function traverses any tree with prints to "visualize" / show the structure of any trees not otherwise visualizable by the plot_tree function.
+    '''
+    if root.is_leaf:
+        print("point:", root.point_id)
+        print("point dist:", root.dist)
+    else:       
+        print("dist:", root.dist)
+    if root.left_tree is not None:
+        print("going left...", level)
+        traverse_tree(root.left_tree, level+1)
+    if root.right_tree is not None:
+        print("going right...", level)
+        traverse_tree(root.right_tree, level+1)
 
 def get_node(root, path):
     if path == '':

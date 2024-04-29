@@ -2,7 +2,7 @@ import efficientdcdist.dctree as dcdist
 import numpy as np
 import heapq
 from density_tree import make_tree
-
+from cluster_tree import prune_tree, copy_tree
 class DCKMedian(object):
 
   def __init__(self, *, k, min_pts):
@@ -135,7 +135,6 @@ class DCKMedian(object):
      '''
      This method assigns all points that have the same distance to multiple centers to noise.
 
-
      Thought TODO: If we prune the tree and smooth out (remove internal nodes where no left/right child is left), then feasibly one could run K-median on it. 
      This might be equivalent to the pruning of the output list of annotations(?)
      '''
@@ -144,7 +143,8 @@ class DCKMedian(object):
      def list_builder(dc_tree, list):
         '''
         Inefficient implementation for now - proof of concept.
-        Helper method that does the recursive list building. 
+        Helper method that does the recursive list building.
+        Returns a list of tuples with the points and the center they are assigned to. 
         '''
         if dc_tree.is_leaf:
             if dc_tree.center_path:
@@ -185,6 +185,97 @@ class DCKMedian(object):
      print("labels:", labels)
      return labels
         
+
+
+  def assign_points_prune_full(self, points, dc_tree):
+     '''
+     This method assigns all points that have the same distance to multiple centers to noise.
+
+     Thought TODO: If we prune the tree and smooth out (remove internal nodes where no left/right child is left), then feasibly one could run K-median on it. 
+     This might be equivalent to the pruning of the output list of annotations(?)
+     '''
+     output = []
+
+     def list_builder(dc_tree, list):
+        '''
+        Inefficient implementation for now - proof of concept.
+        Helper method that does the recursive list building.
+        Returns True from a single-center path and False otherwise
+        '''
+        if dc_tree.is_leaf:
+            if dc_tree.center_path:
+              print("here2")
+
+              #list.append((dc_tree.point_id, dc_tree.unique_center))
+              return True #First list is points we don't know what should be assigned to, second is those we know which center they belong to
+            else:
+               return False
+        else:
+            left_path= list_builder(dc_tree.left_tree, list)
+            right_path = list_builder(dc_tree.right_tree, list)
+
+            if dc_tree.center_path: #On center path they should be assigned
+               print("here1")
+               if dc_tree.num_centers == 1:
+                  return True
+               else: #Not uniquely close to one center
+                  #Now, those points that cmoe from a single-center path should now be pruned together via external method.
+                  #Those that don't should be assigned to noise
+                  if left_path:
+                     points, noise = self.prune_cluster_subtree(dc_tree.left_tree, self.min_pts)
+                  else:
+                     points = self.get_leaves(dc_tree.left_tree)
+                     #Assign to noise
+                  if right_path:
+                     points, noise = self.prune_cluster_subtree(dc_tree.right_tree, self.min_pts)
+
+                  else:
+                     points = self.get_leaves(dc_tree.right_tree)
+
+                  return
+               return
+            else: #Not on center path - cannnot be assigned yet
+               return False
+
+
+     list_builder(dc_tree, output)
+     print("output:", output)
+     n = points.shape[0]
+
+     labels = np.zeros(n)
+     for tup in output:
+      i = tup[0]
+      label = tup[1]
+      labels[i] = label
+     labels = normalize_cluster_ordering(labels) #THIS STEP IS NOT O(n) DUE TO USING SET IN 
+     print("labels:", labels)
+     return labels
+
+
+  def prune_cluster_subtree(self, dc_tree, min_pts):
+   '''
+   Will prune the tree and return the points that should be pruned and those that should be assigned.
+   '''
+   left_size = self.get_tree_size(dc_tree.left_tree)
+   right_size = self.get_tree_size(dc_tree.right_tree)
+
+   left_equidist = self.count_equidist(dc_tree.left_tree, dc_tree.dist)
+   right_equidist = self.count_equidist(dc_tree.right_tree, dc_tree.dist)
+   real_lsize = left_size - left_equidist
+   real_rsize = right_size - right_equidist
+   
+   total_equidist = left_equidist + right_equidist
+
+   total_size = left_size + right_size - total_equidist
+
+   if total_size >= min_pts:
+      return
+
+
+   return
+
+
+
 
   def mark_paths(self, dc_tree, centers):
      '''
@@ -317,6 +408,7 @@ class DCKMedian(object):
      '''
      This removes any centers that only have a path of length 1 before another center trumps it in cost-decrease.
      It returns the pruned list of annotations.
+     Since we use a counter instead of a boolean this is easily extendable to prune paths of length < l. 
      '''
 
      annotations.sort(reverse=True, key=lambda x : x[1]) #Sort by the centers
