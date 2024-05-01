@@ -6,12 +6,11 @@ import matplotlib.pyplot as plt
 import sys
 sys.setrecursionlimit(2000)
 
-class DensityTree:
+class NaryDensityTree:
     def __init__(self, dist, orig_node=None, path='', parent=None):
         self.dist = dist
         self.children = []
-        self.left_tree = None
-        self.right_tree = None
+
         self.label = None
         self.point_id = None
 
@@ -33,42 +32,21 @@ class DensityTree:
         self.path = path
         self.parent = parent
 
-    def set_left_tree(self, left):
-        self.left_tree = left
 
-    def set_right_tree(self, right):
-        self.right_tree = right
 
     @property
-    def has_left_tree(self):
-        return self.left_tree is not None
-
-    @property
-    def has_right_tree(self):
-        return self.right_tree is not None
+    def has_children(self):
+        return len(self.children) != 0
+    
 
     @property
     def is_leaf(self):
-        return not (self.has_left_tree or self.has_right_tree)
+        return not self.has_children
 
     @property
     def in_pruned_tree(self):
         return self.orig_node is not None
 
-    def count_children(self):
-        if not self.is_leaf:
-            if self.left_tree is not None:
-                if self.left_tree.is_leaf:
-                    self.children += [self.left_tree]
-                else:
-                    self.children += self.left_tree.children
-            if self.right_tree is not None:
-                if self.right_tree.is_leaf:
-                    self.children += [self.right_tree]
-                else:
-                    self.children += self.right_tree.children
-        else:
-            self.children = [self]
 
     def __len__(self):
         return len(self.children)
@@ -115,9 +93,28 @@ def _make_tree(all_dists, labels, point_ids, path=''):
     root.count_children()
     return root
 
-def make_tree(points, labels, min_points=1, make_image=False, point_ids=None):
-    #TODO make labels optional...
-    assert len(points.shape) == 2
+def make_tree(points, labels=None, min_points=1, point_ids=None):
+    '''
+    This creates the n-ary version of the dc-tree. 
+
+    Parameters
+    ----------
+
+    points : 2D numpy Array
+        The points over which to create the dc-tree.
+
+    labels :  1D numpy Array, default=None
+        The labels (if any) for the points
+    
+    min_points : Int, default=1
+        The number of points for something to be considered a core-point. This is used for computing the mutual reachability distances used for the dc-distances.
+
+    point_ids : 1D numpy Array, default=None
+        The numbering of the points used in the leaves. 
+    '''
+
+    assert len(points.shape) == 2 #Check that we get a 2D matrix of points
+
     if len(np.unique(points, axis=0)) < len(points):
         raise ValueError('Currently not supported to have multiple duplicates of the same point in the dataset')
     dc_dists = get_dc_dist_matrix(
@@ -129,9 +126,7 @@ def make_tree(points, labels, min_points=1, make_image=False, point_ids=None):
         point_ids = np.arange(int(dc_dists.shape[0]))
 
     root = _make_tree(dc_dists, labels, point_ids)
-    #print("root:", root)
-    if make_image and labels is not None:
-        plot_tree(root, labels)
+
 
     return root, dc_dists
 

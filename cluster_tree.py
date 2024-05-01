@@ -74,7 +74,7 @@ def prune_tree(dc_tree, min_pts, pruned_parent=None, curr_dist=None):
         equidist = count_equidist(dc_tree, dc_tree.dist) #When counting from the root itself, it will always count that node as one, which should be subtracted
     size = len(dc_tree)
     total_size = size - equidist
-    #print("curr_leaves:", get_leaves(dc_tree))
+    #print("curr_leaves:", np.array(get_leaves(dc_tree))+1)
     #print("size:", size, "total_size:", total_size, "curr_dist:", curr_dist, "dc_tree.dist:", dc_tree.dist)
     #print("with truthness:", (size >= min_pts and total_size != 0) or curr_dist == dc_tree.dist)
     if (size >= min_pts and total_size != 0) or (curr_dist == dc_tree.dist and total_size != 0):
@@ -126,6 +126,8 @@ def nary_dc_tree(dc_tree):
     This alleviates any inconsistencies in terms of the construction of the tree.
     There are multiple correct MSTs which means that there are also multiple correct binary dc-trees. This might lead to inconsistencies. 
     '''
+
+    
     return
 
 

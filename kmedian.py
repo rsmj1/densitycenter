@@ -200,43 +200,65 @@ class DCKMedian(object):
         '''
         Inefficient implementation for now - proof of concept.
         Helper method that does the recursive list building.
-        Returns True from a single-center path and False otherwise
+        Returns 0 from a single-center path and 1 from an "unknown" path, and 2 from a multi-center path.
         '''
         if dc_tree.is_leaf:
             if dc_tree.center_path:
-              print("here2")
 
               #list.append((dc_tree.point_id, dc_tree.unique_center))
-              return True #First list is points we don't know what should be assigned to, second is those we know which center they belong to
+              return 0
             else:
-               return False
+               return 1
         else:
             left_path= list_builder(dc_tree.left_tree, list)
             right_path = list_builder(dc_tree.right_tree, list)
-
+            print("Current subtree:", np.array(self.get_leaves(dc_tree))+1)
+            print("left_path:", left_path)
+            print("right_path", right_path)
             if dc_tree.center_path: #On center path they should be assigned
-               print("here1")
+
                if dc_tree.num_centers == 1:
-                  return True
+                  return 0
                else: #Not uniquely close to one center
-                  #Now, those points that cmoe from a single-center path should now be pruned together via external method.
+                  #Now, those points that come from a single-center path should now be pruned together via external method.
                   #Those that don't should be assigned to noise
-                  if left_path:
+                  points, noise = [],[]
+                  if left_path == 0:
+                     print("lp0: assigning points:",  np.array(self.get_leaves(dc_tree.left_tree))+1)
                      points, noise = self.prune_cluster_subtree(dc_tree.left_tree, self.min_pts)
-                  else:
-                     points = self.get_leaves(dc_tree.left_tree)
+                     print("giving:", points, noise)
+                     center = dc_tree.left_tree.unique_center
+                     for point in points:
+                        list.append((point, center))  
+                     for point in noise:
+                        list.append((point, -1))
+                  elif left_path == 1:
+                     print("lp1: assigning to noise:", np.array(self.get_leaves(dc_tree.left_tree)))
+
+                     noise = self.get_leaves(dc_tree.left_tree)
+                     for point in noise:
+                        list.append((point, -1))
                      #Assign to noise
-                  if right_path:
+                  if right_path == 0:
+                     print("rp0: assigning points:",  np.array(self.get_leaves(dc_tree.right_tree))+1)
                      points, noise = self.prune_cluster_subtree(dc_tree.right_tree, self.min_pts)
+                     print("giving:", points, noise)
 
-                  else:
-                     points = self.get_leaves(dc_tree.right_tree)
-
-                  return
-               return
+                     center = dc_tree.right_tree.unique_center
+                     for point in points:
+                        list.append((point, center)) 
+                     for point in noise:
+                        list.append((point, -1))
+                  elif right_path == 1:
+                     print("rp1: assigning to noise:", np.array(self.get_leaves(dc_tree.right_tree)))
+                     noise = self.get_leaves(dc_tree.right_tree)
+                     for point in noise:
+                        list.append((point, -1))    
+                  
+                  return 2 #Return false here - 
+            
             else: #Not on center path - cannnot be assigned yet
-               return False
-
+               return 1
 
      list_builder(dc_tree, output)
      print("output:", output)
@@ -256,11 +278,11 @@ class DCKMedian(object):
    '''
    Will prune the tree and return the points that should be pruned and those that should be assigned.
    '''
-   pruned_tree = prune_tree(dc_tree)
+   print("Pruning the following tree:", self.get_leaves(dc_tree))
+   pruned_tree = prune_tree(dc_tree, min_pts)
+   print("prune_cluster_subtree on the following tree:", pruned_tree)
 
    def noise_collector(tree, points_list, noise_list):
-      
-      
       if tree.is_leaf:
          if tree.point_id < 0: #This is noise
             noise_list += self.get_leaves(tree.orig_node)
@@ -275,10 +297,16 @@ class DCKMedian(object):
             return
          
          noise_collector(tree.left_tree, points_list, noise_list)
-         noise_collector(tree.right_tree)
+         noise_collector(tree.right_tree, points_list, noise_list)
 
+   points, noise = [],[]
 
-   return noise_collector(pruned_tree, [],[])
+   if pruned_tree is None: #If everything is pruned
+      noise += self.get_leaves(dc_tree)
+   else:
+      noise_collector(pruned_tree, points, noise)
+
+   return points, noise
 
 
 
@@ -307,12 +335,6 @@ class DCKMedian(object):
         return union_path
 
 
-  def assign_points_prune_v2(self, points, dc_tree, min_pts):
-     '''
-     This method will both assign points that are equidistant to two clusters and branch-off points to noise. 
-     #TODO: Need to understand how this should work in the first place...
-     '''
-     return
 
   def efficient_greedy(self, points):
      '''
@@ -350,10 +372,11 @@ class DCKMedian(object):
 
 
      self.mark_paths(dc_tree, centers)
-     self.labels_ = self.assign_points_prune(points, dc_tree)
+     self.labels_ = self.assign_points_prune_full(points, dc_tree)
      print("labels:", self.labels_)
      self.center_indexes = centers
      self.centers = points[centers]
+     print("Done with K-median!")
      return
   
   def annotate_tree(self, tree):

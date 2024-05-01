@@ -32,7 +32,7 @@ def get_reach_dists(D, min_points, num_points):
     D *= diag_mask
     return D
 
-def get_dc_dist_matrix(points, n_neighbors, min_points=5, **kwargs):
+def get_dc_dist_matrix(points, min_points=5, **kwargs):
     """
     We define the distance from x_i to x_j as min(max(P(x_i, x_j))), where 
         - P(x_i, x_j) is any path from x_i to x_j

@@ -186,12 +186,12 @@ if __name__ == '__main__':
     dbscan_labels = dbscan.labels_
 
 
-    hdbscan_new = newScan(min_pts=min_pts, min_cluster_size=mcs, allow_single_cluster=True)
-    hdbscan_new.fit(points)
-    hdb_new_labels = hdbscan_new.labels_
-    num_clusters_new = len(np.unique(hdb_new_labels))
-    if np.isin(-1, hdb_new_labels) and num_clusters_new != 1: #Should not count noise labels as a set of labels
-                num_clusters_new -= 1
+    # hdbscan_new = newScan(min_pts=min_pts, min_cluster_size=mcs, allow_single_cluster=True)
+    # hdbscan_new.fit(points)
+    # hdb_new_labels = hdbscan_new.labels_
+    # num_clusters_new = len(np.unique(hdb_new_labels))
+    # if np.isin(-1, hdb_new_labels) and num_clusters_new != 1: #Should not count noise labels as a set of labels
+    #             num_clusters_new -= 1
     #visualize(points=points, cluster_labels=None, minPts=min_pts, distance="dc_dist", centers=centers, save=save_visualization, save_name=image_save_name)
 
     #plot_tree(root, kmedian_labels, kmedian_centers, save=save_visualization, save_name=image_save_name)
@@ -209,18 +209,17 @@ if __name__ == '__main__':
     kmeans_hk.plusplus_dc_kmeans(points=points, minPts=min_pts, max_iters=100)
     kmeans_labels_hk = kmeans_hk.labels_
 
-    k = str(k)
-    hk = str(num_clusters)
-    hk_new = str(num_clusters_new)
+    # k = str(k)
+    # hk = str(num_clusters)
+    # hk_new = str(num_clusters_new)
 
-    print("equal if zero:", np.count_nonzero(normalize_cluster_ordering(hdb_labels) -normalize_cluster_ordering(hdb_new_labels)) )
-    print("New:", normalize_cluster_ordering(hdb_new_labels))
-    print("Old:", normalize_cluster_ordering(hdb_labels))
+    # print("equal if zero:", np.count_nonzero(normalize_cluster_ordering(hdb_labels) -normalize_cluster_ordering(hdb_new_labels)) )
+    # print("New:", normalize_cluster_ordering(hdb_new_labels))
+    # print("Old:", normalize_cluster_ordering(hdb_labels))
 
     #Pruning the tree here:
     new_root = prune_tree(root, 3)
 
-    print("root point id:", root.point_id)
 
 
     ################################### RESULTS VISUALIZATION #####################################
