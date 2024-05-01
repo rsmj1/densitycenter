@@ -256,23 +256,15 @@ class DCKMedian(object):
    '''
    Will prune the tree and return the points that should be pruned and those that should be assigned.
    '''
-   left_size = self.get_tree_size(dc_tree.left_tree)
-   right_size = self.get_tree_size(dc_tree.right_tree)
+   pruned_tree = prune_tree(dc_tree)
 
-   left_equidist = self.count_equidist(dc_tree.left_tree, dc_tree.dist)
-   right_equidist = self.count_equidist(dc_tree.right_tree, dc_tree.dist)
-   real_lsize = left_size - left_equidist
-   real_rsize = right_size - right_equidist
-   
-   total_equidist = left_equidist + right_equidist
-
-   total_size = left_size + right_size - total_equidist
-
-   if total_size >= min_pts:
+   def noise_collector(tree, points_list, noise_list):
+      
       return
 
+   
 
-   return
+   return noise_collector(pruned_tree, [],[])
 
 
 

@@ -56,7 +56,7 @@ def copy_tree(root, min_points, pruned_parent=None):
 
     return None
 
-def prune_tree(dc_tree, min_pts, pruned_parent=None):
+def prune_tree(dc_tree, min_pts, pruned_parent=None, curr_dist=None):
     '''
     Version mainly used for visualization.
 
@@ -65,20 +65,28 @@ def prune_tree(dc_tree, min_pts, pruned_parent=None):
     For something that becomes a leaf by pruning, the sub-structure under it will be reinstated. 
     '''
 
-    #equidist = count_equidist(dc_tree, dc_tree.dist)
-    #total_size = len(dc_tree) - equidist
-    if len(dc_tree) >= min_pts:
+    #If len(dc_tree) is 1 - then it is to be pruned no matter what
+    #If curr_dist is same as dist in current node, then this node is not noise. That would have been detected higher up in the tree if it was.
+
+    if dc_tree.dist == 0.0:
+        equidist = 0
+    else:
+        equidist = count_equidist(dc_tree, dc_tree.dist) #When counting from the root itself, it will always count that node as one, which should be subtracted
+    size = len(dc_tree)
+    total_size = size - equidist
+    #print("curr_leaves:", get_leaves(dc_tree))
+    #print("size:", size, "total_size:", total_size, "curr_dist:", curr_dist, "dc_tree.dist:", dc_tree.dist)
+    #print("with truthness:", (size >= min_pts and total_size != 0) or curr_dist == dc_tree.dist)
+    if (size >= min_pts and total_size != 0) or (curr_dist == dc_tree.dist and total_size != 0):
         pruned_root = DensityTree(dc_tree.dist, orig_node=dc_tree, path=dc_tree.path, parent=pruned_parent)
         if dc_tree.left_tree is not None:
-            pruned_root.set_left_tree(prune_tree(dc_tree.left_tree, min_pts, pruned_root))
+            pruned_root.set_left_tree(prune_tree(dc_tree.left_tree, min_pts, pruned_root, dc_tree.dist))
         if dc_tree.right_tree is not None:
-            pruned_root.set_right_tree(prune_tree(dc_tree.right_tree, min_pts, pruned_root))
+            pruned_root.set_right_tree(prune_tree(dc_tree.right_tree, min_pts, pruned_root, dc_tree.dist))
         pruned_root.count_children()
 
         #Now reinstate things for usage and visualization
         if pruned_root.is_leaf and min_pts > 1: #If leaf - put everything back under it.
-            pruned_root.set_left_tree(dc_tree.left_tree)
-            pruned_root.set_right_tree(dc_tree.right_tree)
             pruned_root = dc_tree
             return pruned_root
 
@@ -92,13 +100,39 @@ def prune_tree(dc_tree, min_pts, pruned_parent=None):
             pruned_root.set_right_tree(leaf)
 
         return pruned_root
+    #Else:
+    if size >= min_pts and curr_dist != dc_tree.dist: #The curr_dist != dc_tree.dist decides whether to call multiple nodes at same dist when from that node also other things move from there noise or not.
+        #If size >= min_pts, this must be a leaf node in the pruned tree
+        #This is to account for the fact that when we have multiple nodes at the same distance they might make the above node in the tree look like a leaf, although it is the root of the multiple at same distance that is the leaf of the pruned tree.
+        #We then reinstate anything below this.
+        return dc_tree
     
-    return None
+    return None  #Not a leaf - just a pruned part of the tree.
+
+def get_leaves(dc_tree):
+    '''
+    Returns the set of ids of the leaf nodes within the given cluster.
+    '''
+    if dc_tree.is_leaf:
+        return [dc_tree.point_id]
+    else:
+        #print("left:", self.get_leaves(dc_tree.left_tree))
+        #print("right:", self.get_tree_size(dc_tree.right_tree))
+        return get_leaves(dc_tree.left_tree) + get_leaves(dc_tree.right_tree)
+
+def nary_dc_tree(dc_tree):
+    '''
+    Makes the binary dc-tree into an n-ary tree instead. 
+    This alleviates any inconsistencies in terms of the construction of the tree.
+    There are multiple correct MSTs which means that there are also multiple correct binary dc-trees. This might lead to inconsistencies. 
+    '''
+    return
 
 
 def count_equidist(dc_tree, dist):
     '''
     Counts the number of points within the given dc_tree that are at the given distance dist.
+    Cannot be called on a leaf node with distance of 0 - will fail. 
     '''
     if dc_tree.dist != dist:
         return 0
