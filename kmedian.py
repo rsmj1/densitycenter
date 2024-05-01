@@ -260,9 +260,23 @@ class DCKMedian(object):
 
    def noise_collector(tree, points_list, noise_list):
       
-      return
+      
+      if tree.is_leaf:
+         if tree.point_id < 0: #This is noise
+            noise_list += self.get_leaves(tree.orig_node)
+            return
+         else:
+            points_list += [tree.point_id]
+      else:
+         l_point_id = tree.left_tree.point_id
+         r_point_id = tree.right_tree.point_id
+         if l_point_id is None and r_point_id is None: #If these are none they are internal nodes - ergo we have a split in the pruned tree.
+            points_list += self.get_leaves(tree.orig_node)
+            return
+         
+         noise_collector(tree.left_tree, points_list, noise_list)
+         noise_collector(tree.right_tree)
 
-   
 
    return noise_collector(pruned_tree, [],[])
 

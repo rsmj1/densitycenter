@@ -147,7 +147,6 @@ if __name__ == '__main__':
     )
     
     
-    
     #K-center
     pred_labels, kcenter_centers, epsilons = dc_clustering(root, num_points=len(labels), k=k, min_points=min_pts,with_noise=True)
 
@@ -221,7 +220,8 @@ if __name__ == '__main__':
     #Pruning the tree here:
     new_root = prune_tree(root, 3)
 
-    
+    print("root point id:", root.point_id)
+
 
     ################################### RESULTS VISUALIZATION #####################################
     #Plot the complete graph from the dataset with the specified distance measure on all of the edges. Optionally show the distances in embedded space with MDS.
