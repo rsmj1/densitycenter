@@ -79,39 +79,33 @@ def tree_builder(dists, labels, point_ids):
     print("dists:", np.round(dists,2))
 
     largest_dist = np.max(dists[0]) #You can always find the largest distance in every row.
-    best_inds, is_leaf = get_next_inds(dists, largest_dist)
-    other_inds = np.array([i for i in np.arange(dists.shape[0]) if i not in set(best_inds)])
-
     root = NaryDensityTree(largest_dist)
+    
+    
+    split_groups = get_next_inds(dists, largest_dist) #Get the split structure for this level of the tree
 
-    print("best_inds:", best_inds)
-    print("worst_inds:", other_inds)
-    print("is_leaf?", is_leaf)
+    for group in split_groups.values():
+        is_leaf = group[0]
+        inds = np.array(group[1])
+        print("I have indices:", inds)
+        print("leaf?", is_leaf)
+        if is_leaf: #If the group is a "leaf group" all the indices should each be added as separate leaves from the current root.
+            for i in inds:
+                if labels is None:
+                    root.add_child(NaryDensityTree(0, point_id=point_ids[i], parent=root))
+                else:
+                    root.add_child(NaryDensityTree(0, point_id=point_ids[i], parent=root, label=labels[i]))
+        else:
+            recurse_dists = dists[inds][:, inds]
+            recurse_labels = labels[inds] if labels is not None else None
+            recurse_point_ids =  point_ids[inds]
+            root.add_child(tree_builder(recurse_dists, recurse_labels, recurse_point_ids))
 
-    other_recurse_dists = dists[other_inds][:, other_inds]
-    other_recurse_labels = labels[other_inds] if labels is not None else None
-    other_recurse_point_ids =  point_ids[other_inds]
-
-    if is_leaf:
-        for i in best_inds:
-            if labels is None:
-                root.add_child(NaryDensityTree(0, point_id=point_ids[i], parent=root))
-            else:
-                root.add_child(NaryDensityTree(0, point_id=point_ids[i], parent=root, label=labels[i]))
-        root.add_child(tree_builder(other_recurse_dists, other_recurse_labels, other_recurse_point_ids))
-
-    else:
-        recurse_dists = dists[best_inds][:, best_inds]
-        recurse_labels = labels[best_inds] if labels is not None else None
-        recurse_point_ids =  point_ids[best_inds]
-        root.add_child(tree_builder(other_recurse_dists, other_recurse_labels, other_recurse_point_ids))
-        root.add_child(tree_builder)
-
-    #Find the biggest distance in the matrix. Find all points (if more than one)
-    return
+    return root
+    
 
 @nb.njit()
-def get_next_inds(dists, largest_dist):
+def get_next_inds_old(dists, largest_dist):
     '''
     Finds the next split in the tree, returning the indices of one side of the split
     The sum is just a counter of the number of max_dists encountered. No need to sum up to introduce numerical errors in final comparison.
@@ -146,7 +140,50 @@ def get_next_inds(dists, largest_dist):
         return best_rows[:ctr],  False
 
 
+def get_next_inds(dists, largest_dist):
+    '''
+    Finds the next split in the tree, returning the indices of one side of the split
+    The sum is just a counter of the number of max_dists encountered. No need to sum up to introduce numerical errors in final comparison.
+    
+    TODO: Add support for multi splits at same height - we can detect how big the split is by the amount of unique numbers of the max dist we have in the array.
+    Every set of same number of max dist will be its own subtree. 
+    '''
+    n = dists.shape[0]
+    split_groups = {}
 
+    work_dists, leaf = binarize_array(dists, largest_dist)
+
+    print("work_dists:", work_dists)
+    for i, row in enumerate(work_dists):
+        split_group = tuple(row)
+        if split_group not in split_groups:
+            print("split_group:", split_group)
+            split_groups[split_group] = [False, []]
+        if leaf == i:
+            split_groups[split_group][0] = True
+        split_groups[split_group][1].append(i)
+    return split_groups
+
+@nb.njit()
+def binarize_array(arr, one_val):
+    '''
+    Based on the provided one_val, it will turn the array into a binary version with ones for point to itself and dist==one_val.
+
+    Also checks whether there are any points that will be leaves at this level, returning true if yes, and returning one of the points that will be a leaf. 
+    '''
+    new_arr = np.zeros(arr.shape, dtype=np.int64)
+    leaf_index = -1
+    for i in range(arr.shape[0]):
+        row_sum = 0
+        for j in range(arr.shape[1]):
+            if arr[i,j] == one_val:
+                new_arr[i,j] = 1
+                row_sum += 1
+        if row_sum == arr.shape[0]- 1:
+            leaf_index = i
+            new_arr[i,i] = 1 #If we have equidistant leaves they should all get in the same group. This only happens if they also have ones for themselves - otherwise we get 0111, 1011, 1101, 1110...
+
+    return new_arr, leaf_index
 
 
 def _make_tree(all_dists, labels, point_ids, path=''):
