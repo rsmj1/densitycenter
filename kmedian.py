@@ -212,9 +212,9 @@ class DCKMedian(object):
         else:
             left_path= list_builder(dc_tree.left_tree, list)
             right_path = list_builder(dc_tree.right_tree, list)
-            print("Current subtree:", np.array(self.get_leaves(dc_tree))+1)
-            print("left_path:", left_path)
-            print("right_path", right_path)
+            # print("Current subtree:", np.array(self.get_leaves(dc_tree))+1)
+            # print("left_path:", left_path)
+            # print("right_path", right_path)
             if dc_tree.center_path: #On center path they should be assigned
 
                if dc_tree.num_centers == 1:
@@ -224,25 +224,25 @@ class DCKMedian(object):
                   #Those that don't should be assigned to noise
                   points, noise = [],[]
                   if left_path == 0:
-                     print("lp0: assigning points:",  np.array(self.get_leaves(dc_tree.left_tree))+1)
+                     #print("lp0: assigning points:",  np.array(self.get_leaves(dc_tree.left_tree))+1)
                      points, noise = self.prune_cluster_subtree(dc_tree.left_tree, self.min_pts)
-                     print("giving:", points, noise)
+                     #print("giving:", points, noise)
                      center = dc_tree.left_tree.unique_center
                      for point in points:
                         list.append((point, center))  
                      for point in noise:
                         list.append((point, -1))
                   elif left_path == 1:
-                     print("lp1: assigning to noise:", np.array(self.get_leaves(dc_tree.left_tree)))
+                     #print("lp1: assigning to noise:", np.array(self.get_leaves(dc_tree.left_tree)))
 
                      noise = self.get_leaves(dc_tree.left_tree)
                      for point in noise:
                         list.append((point, -1))
                      #Assign to noise
                   if right_path == 0:
-                     print("rp0: assigning points:",  np.array(self.get_leaves(dc_tree.right_tree))+1)
+                     #print("rp0: assigning points:",  np.array(self.get_leaves(dc_tree.right_tree))+1)
                      points, noise = self.prune_cluster_subtree(dc_tree.right_tree, self.min_pts)
-                     print("giving:", points, noise)
+                     #print("giving:", points, noise)
 
                      center = dc_tree.right_tree.unique_center
                      for point in points:
@@ -250,7 +250,7 @@ class DCKMedian(object):
                      for point in noise:
                         list.append((point, -1))
                   elif right_path == 1:
-                     print("rp1: assigning to noise:", np.array(self.get_leaves(dc_tree.right_tree)))
+                     #print("rp1: assigning to noise:", np.array(self.get_leaves(dc_tree.right_tree)))
                      noise = self.get_leaves(dc_tree.right_tree)
                      for point in noise:
                         list.append((point, -1))    
@@ -261,7 +261,7 @@ class DCKMedian(object):
                return 1
 
      list_builder(dc_tree, output)
-     print("output:", output)
+     #print("output:", output)
      n = points.shape[0]
 
      labels = np.zeros(n)
@@ -270,7 +270,7 @@ class DCKMedian(object):
       label = tup[1]
       labels[i] = label
      labels = normalize_cluster_ordering(labels) #THIS STEP IS NOT O(n) DUE TO USING SET IN 
-     print("labels:", labels)
+     #print("labels:", labels)
      return labels
 
 
@@ -278,9 +278,9 @@ class DCKMedian(object):
    '''
    Will prune the tree and return the points that should be pruned and those that should be assigned.
    '''
-   print("Pruning the following tree:", self.get_leaves(dc_tree))
+   #print("Pruning the following tree:", self.get_leaves(dc_tree))
    pruned_tree = prune_tree(dc_tree, min_pts)
-   print("prune_cluster_subtree on the following tree:", pruned_tree)
+   #print("prune_cluster_subtree on the following tree:", pruned_tree)
 
    def noise_collector(tree, points_list, noise_list):
       if tree.is_leaf:
@@ -443,14 +443,14 @@ class DCKMedian(object):
      annotations.sort(reverse=True, key=lambda x : x[1]) #Sort by the centers
 
      to_remove = set()
-     print("annotations:", [annotation[1] for annotation in annotations])
+     #print("annotations:", [annotation[1] for annotation in annotations])
      curr_center = annotations[0][1]
      ctr = 0
      for annotation in annotations[1:]:
         new_center = annotation[1]
         if new_center != curr_center and ctr == 0:
            to_remove.add(curr_center)
-           print("removed", curr_center)
+           #print("removed", curr_center)
            curr_center = new_center
         elif new_center != curr_center:
            curr_center = new_center
@@ -458,10 +458,10 @@ class DCKMedian(object):
         else:
            ctr += 1
      if ctr == 0:
-        print("removed", curr_center)
+        #print("removed", curr_center)
         to_remove.add(curr_center)
      new_annotations = [annotation for annotation in annotations if annotation[1] not in to_remove]
-     print("annotations:", [annotation[1] for annotation in new_annotations])
+     #print("annotations:", [annotation[1] for annotation in new_annotations])
 
      return new_annotations
 

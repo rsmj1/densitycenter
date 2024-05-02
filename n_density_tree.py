@@ -66,7 +66,7 @@ def tree_builder(dists, labels, point_ids):
     Leaf nodes will have (n-1)*largest_dist as the sum of their row.
 
     '''
-    print("dists:", np.round(dists,2))
+    #print("dists:", np.round(dists,2))
 
     largest_dist = np.max(dists[0]) #You can always find the largest distance in every row.
     root = NaryDensityTree(largest_dist)
@@ -77,8 +77,8 @@ def tree_builder(dists, labels, point_ids):
     for group in split_groups.values():
         is_leaf = group[0]
         inds = np.array(group[1])
-        print("I have indices:", inds)
-        print("leaf?", is_leaf)
+        #print("I have indices:", inds)
+        #print("leaf?", is_leaf)
         if is_leaf: #If the group is a "leaf group" all the indices should each be added as separate leaves from the current root.
             for i in inds:
                 if labels is None:
@@ -107,11 +107,11 @@ def get_next_inds(dists, largest_dist):
 
     work_dists, leaf = binarize_array(dists, largest_dist)
 
-    print("work_dists:", work_dists)
+    #print("work_dists:", work_dists)
     for i, row in enumerate(work_dists):
         split_group = tuple(row)
         if split_group not in split_groups:
-            print("split_group:", split_group)
+            #print("split_group:", split_group)
             split_groups[split_group] = [False, []]
         if leaf == i:
             split_groups[split_group][0] = True
@@ -140,7 +140,7 @@ def binarize_array(arr, one_val):
     return new_arr, leaf_index
 
 
-def make_tree(points, labels=None, min_points=1, point_ids=None):
+def make_n_tree(points, labels=None, min_points=1, point_ids=None):
     '''
     This creates the n-ary version of the dc-tree. 
 
@@ -178,23 +178,6 @@ def make_tree(points, labels=None, min_points=1, point_ids=None):
     return root, dc_dists
 
 
+#root, _ = make_n_tree(points, labels, min_points=3)
 
-points = np.array([[1,2],
-                    [1,4],
-                    [2,3],
-                    [1,1],
-                    [-5,15], #5
-                    [11,13],
-                    [13,11],
-                    [10,8],
-                    [14,13],
-                    [16,17], #10
-                    [18,19],
-                    [19,18],
-                    ]
-                    )
-labels = np.array([0,1,2,3,4,5,6,7,8,9,10,11])
-
-root, _ = make_tree(points, labels, min_points=3)
-
-plot_nary_tree(root, labels)
+#plot_nary_tree(root, labels)

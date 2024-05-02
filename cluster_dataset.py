@@ -13,11 +13,14 @@ import time
 from experiment_utils.get_data import get_dataset, make_circles
 from distance_metric import get_dc_dist_matrix
 from density_tree import make_tree
+from n_density_tree import make_n_tree
+
+
 from tree_plotting import plot_embedding
 from tree_plotting import plot_tree
 from cluster_tree import dc_clustering
 from point_gen import create_hierarchical_clusters
-from visualization import visualize
+from visualization import visualize, plot_nary_tree
 from benchmark import create_dataset
 from benchmark import normalize_cluster_ordering
 from cluster_tree import copy_tree, prune_tree
@@ -114,38 +117,44 @@ if __name__ == '__main__':
 
 
 
-    # points = np.array([[1,2],
-    #                    [1,4],
-    #                    [2,3],
-    #                    [1,1],
-    #                    [-5,15], #5
-    #                    [11,13],
-    #                    [13,11],
-    #                    [10,8],
-    #                    [14,13],
-    #                    [16,17], #10
-    #                    [18,19],
-    #                    [19,18],
-    #                    [21,24],
-    #                    [11,17],
-    #                    [28,21], #15
-    #                    [10,18],
-    #                    [7,7]
-    #                    ]
-    #                    )
-    # labels = np.array([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16])
+    points = np.array([[1,2],
+                       [1,4],
+                       [2,3],
+                       [1,1],
+                       [-5,15], #5
+                       [11,13],
+                       [13,11],
+                       [10,8],
+                       [14,13],
+                       [16,17], #10
+                       [18,19],
+                       [19,18],
+                       [21,24],
+                       [11,17],
+                       [28,21], #15
+                       [10,18],
+                       [7,7]
+                       ]
+                       )
+    labels = np.array([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16])
     #points, labels = create_dataset(num_points=num_points, type=dataset_type, save=save_dataset, load=load_dataset, save_name=save_name, load_name=load_name)
 
 
-
+    t1 = time.time()
     root, dc_dists = make_tree(
     points,
     labels,
     min_points=min_pts,
     make_image=plot_tree_bool
     )
+    t2 = time.time()
+    n_root,_ = make_n_tree(points, None, min_points=min_pts)
     
-    
+    t3 = time.time()
+
+    print("bin dctree:", t2-t1)
+
+    print("nary dctree:", t3-t2)
     #K-center
     pred_labels, kcenter_centers, epsilons = dc_clustering(root, num_points=len(labels), k=k, min_points=min_pts,with_noise=True)
 
@@ -158,43 +167,29 @@ if __name__ == '__main__':
 
     kmeans_labels = kmeans.labels_
     centers = kmeans.centers
-
     
 
-    print("here!!!")
     #K-median clustering
     kmedian = DCKMedian(k=k, min_pts=min_pts)
     kmedian.fit(points)
 
     kmedian_labels = kmedian.labels_
     kmedian_centers = kmedian.center_indexes
-    #print("kmedian labels:", kmedian_labels)
-    print("here2")
-    '''
-    HDBSCAN clustering:
-    https://scikit-learn.org/stable/modules/generated/sklearn.cluster.HDBSCAN.html
-    Has following relevant arguments: 
-    - min_cluster_size: default=5
-    - min_samples: defaults to min_cluster_size. This functions as minPts.  
-    - metric: default = 'euclidean'
 
-    '''
 
     dbscan = DBSCAN(eps=eps, min_pts=min_pts)
     dbscan.fit(points)
     dbscan_labels = dbscan.labels_
 
 
-    # hdbscan_new = newScan(min_pts=min_pts, min_cluster_size=mcs, allow_single_cluster=True)
-    # hdbscan_new.fit(points)
-    # hdb_new_labels = hdbscan_new.labels_
-    # num_clusters_new = len(np.unique(hdb_new_labels))
-    # if np.isin(-1, hdb_new_labels) and num_clusters_new != 1: #Should not count noise labels as a set of labels
-    #             num_clusters_new -= 1
-    #visualize(points=points, cluster_labels=None, minPts=min_pts, distance="dc_dist", centers=centers, save=save_visualization, save_name=image_save_name)
+    hdbscan_new = newScan(min_pts=min_pts, min_cluster_size=mcs, allow_single_cluster=True)
+    hdbscan_new.fit(points)
+    hdb_new_labels = hdbscan_new.labels_
+    num_clusters_new = len(np.unique(hdb_new_labels))
+    if np.isin(-1, hdb_new_labels) and num_clusters_new != 1: #Should not count noise labels as a set of labels
+                num_clusters_new -= 1
 
-    #plot_tree(root, kmedian_labels, kmedian_centers, save=save_visualization, save_name=image_save_name)
-    #raise AssertionError("stop")
+
 
     hdbscan = HDBSCAN(min_cluster_size=mcs, min_samples=min_pts)
     hdbscan.fit(points)
@@ -203,21 +198,24 @@ if __name__ == '__main__':
     num_clusters = len(np.unique(hdb_labels))
     if np.isin(-1, hdb_labels) and num_clusters != 1: #Should not count noise labels as a set of labels
                 num_clusters -= 1
+    
+    
     #Kmeans using same number of clusters as hdbscan finds
     kmeans_hk = DCKMeans(k=num_clusters, min_pts=min_pts)
     kmeans_hk.plusplus_dc_kmeans(points=points, minPts=min_pts, max_iters=100)
     kmeans_labels_hk = kmeans_hk.labels_
 
-    # k = str(k)
-    # hk = str(num_clusters)
-    # hk_new = str(num_clusters_new)
+    k = str(k)
+    hk = str(num_clusters)
+    hk_new = str(num_clusters_new)
 
     # print("equal if zero:", np.count_nonzero(normalize_cluster_ordering(hdb_labels) -normalize_cluster_ordering(hdb_new_labels)) )
     # print("New:", normalize_cluster_ordering(hdb_new_labels))
     # print("Old:", normalize_cluster_ordering(hdb_labels))
 
     #Pruning the tree here:
-    new_root = prune_tree(root, 3)
+    #new_root = prune_tree(root, 3)
+    #plot_tree(new_root, labels)
 
 
 
@@ -229,12 +227,11 @@ if __name__ == '__main__':
         # plot_tree(root, hdb_new_labels, None, save=save_visualization, save_name=image_save_name)
         # plot_tree(root, hdb_labels, None, save=save_visualization, save_name=image_save_name)
 
-        plot_tree(new_root, labels)
 
         #K-median dc-tree labellings:
         #root.dist = 500
         plot_tree(root, kmedian_labels, kmedian_centers, save=save_visualization, save_name=image_save_name)
-
+        plot_nary_tree(n_root, kmedian_labels, kmedian_centers, save=save_visualization, save_name=image_save_name)
         #Plot the dc-tree, optionally with the centers from the final kmeans clusters marked in red
         #plot_tree(root, kmeans_labels, kmeans.center_indexes, save=save_visualization, save_name=image_save_name)
         #plot_tree(root, hdb_labels, None, save=save_visualization, save_name=image_save_name)

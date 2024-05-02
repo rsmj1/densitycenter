@@ -99,27 +99,17 @@ def _make_tree(all_dists, labels, point_ids, path=''):
         root.point_id = point_ids[0]
         root.children = [root]
         return root
-    print("largest_dist:", largest_dist)
     
     left_inds, right_inds = get_inds(all_dists, largest_dist)
-    right_split = all_dists[right_inds][:, right_inds]
-
-    
-
-
     left_split = all_dists[left_inds][:, left_inds]
 
-
-    print("left_inds:", left_inds)
-    print("right_inds:", right_inds)
-    print("left_split:", np.round(left_split,2))
-    print("right_split:", np.round(right_split,2))
     left_labels, left_point_ids = labels[left_inds], point_ids[left_inds]
     root.set_left_tree(_make_tree(left_split, left_labels, left_point_ids, path=path+'l'))
     root.left_tree.parent = root
 
     right_split = all_dists[right_inds][:, right_inds]
     right_labels, right_point_ids = labels[right_inds], point_ids[right_inds]
+    
     root.set_right_tree(_make_tree(right_split, right_labels, right_point_ids, path=path+'r'))
     root.right_tree.parent = root
 
