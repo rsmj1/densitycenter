@@ -114,27 +114,27 @@ if __name__ == '__main__':
 
 
 
-    points = np.array([[1,2],
-                       [1,4],
-                       [2,3],
-                       [1,1],
-                       [-5,15], #5
-                       [11,13],
-                       [13,11],
-                       [10,8],
-                       [14,13],
-                       [16,17], #10
-                       [18,19],
-                       [19,18],
-                       [21,24],
-                       [11,17],
-                       [28,21], #15
-                       [10,18],
-                       [7,7]
-                       ]
-                       )
-    labels = np.array([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16])
-    points, labels = create_dataset(num_points=num_points, type=dataset_type, save=save_dataset, load=load_dataset, save_name=save_name, load_name=load_name)
+    # points = np.array([[1,2],
+    #                    [1,4],
+    #                    [2,3],
+    #                    [1,1],
+    #                    [-5,15], #5
+    #                    [11,13],
+    #                    [13,11],
+    #                    [10,8],
+    #                    [14,13],
+    #                    [16,17], #10
+    #                    [18,19],
+    #                    [19,18],
+    #                    [21,24],
+    #                    [11,17],
+    #                    [28,21], #15
+    #                    [10,18],
+    #                    [7,7]
+    #                    ]
+    #                    )
+    # labels = np.array([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16])
+    #points, labels = create_dataset(num_points=num_points, type=dataset_type, save=save_dataset, load=load_dataset, save_name=save_name, load_name=load_name)
 
 
 
@@ -142,8 +142,7 @@ if __name__ == '__main__':
     points,
     labels,
     min_points=min_pts,
-    make_image=plot_tree_bool,
-    n_neighbors=n_neighbors
+    make_image=plot_tree_bool
     )
     
     
