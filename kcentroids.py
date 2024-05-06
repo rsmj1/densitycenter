@@ -50,14 +50,13 @@ class DCKCentroids(object):
       placeholder = np.zeros(n)
       dc_tree, _ = make_tree(points, placeholder, min_points=self.min_pts, )
 
-      if self.loss == "kmedian":
-        annotations = self.annotate_tree_kmedian(dc_tree)
-      elif self.loss == "kmeans":
-        annotations = self.annotate_tree_kmeans(dc_tree)
+      annotations = self.annotate_tree(dc_tree) #Will use K-means or K-median loss depending on self.loss
+
 
       if self.noise_mode == "medium" or self.noise_mode == "full":
             #This is to avoid picking noise points as centers
-            annotations = self.prune_annotations(annotations)
+            annotations = self.prune_annotations(annotations) #This prunes based on occurences in the annotation list.
+            annotations = self.prune_annotations_other(annotations) #This prunes based on the pruned tree.
 
       annotations.sort(reverse=True, key=lambda x : x[0]) #Sort by the first value of the tuples - the potential cost-decrease. Reverse=True to get descending order.
       cluster_centers = set() #We should not use the "in" operation, as it is a worst-case O(n) operation. Just add again and again
@@ -318,7 +317,7 @@ class DCKCentroids(object):
       else:
          l_point_id = tree.left_tree.point_id
          r_point_id = tree.right_tree.point_id
-         if l_point_id is None and r_point_id is None: #If these are none they are internal nodes - ergo we have a split in the pruned tree.
+         if l_point_id is None and r_point_id is None: #If these ids are none they are internal nodes - ergo we have a split in the pruned tree.
             points_list += self.get_leaves(tree.orig_node)
             return
          
@@ -326,7 +325,6 @@ class DCKCentroids(object):
          noise_collector(tree.right_tree, points_list, noise_list)
 
    points, noise = [],[]
-
    if pruned_tree is None: #If everything is pruned
       noise += self.get_leaves(dc_tree)
    else:
@@ -334,7 +332,31 @@ class DCKCentroids(object):
 
    return points, noise
 
+  def prune_cluster_subtree_aggressive(self, dc_tree, min_pts):
+   '''
+   Will prune the tree and return the points that should be pruned and those that should be assigned.
+   This keeps going to the leaves of the pruned tree no matter whether there is a split in the pruned tree or not. 
+   '''
+   pruned_tree = prune_tree(dc_tree, min_pts)
 
+   def noise_collector(tree, points_list, noise_list):
+      if tree.is_leaf:
+         if tree.point_id < 0: #This is noise
+            noise_list += self.get_leaves(tree.orig_node)
+            return
+         else:
+            points_list += [tree.point_id]
+      else:
+         noise_collector(tree.left_tree, points_list, noise_list)
+         noise_collector(tree.right_tree, points_list, noise_list)
+
+   points, noise = [],[]
+   if pruned_tree is None: #If everything is pruned
+      noise += self.get_leaves(dc_tree)
+   else:
+      noise_collector(pruned_tree, points, noise)
+
+   return points, noise
 
   def mark_center_paths(self, dc_tree, centers):
      '''
@@ -360,89 +382,7 @@ class DCKCentroids(object):
            dc_tree.unique_center = union_path[0]
         return union_path
 
-
-
     ######################## Methods that are K-means / K-median specific ########################
-
-  def annotate_tree_kmedian(self, tree):
-     '''
-     Does bottom-up on the dc-tree, generating an array of the annotations. We do not need to keep track of which tree-node generated which annotation
-     , so the order in which they are inserted into the array does not matter. 
-     Appending to a list is amortized O(n).
-     It follows the cost_computation algorithm from my paper.
-     '''
-
-     output = []
-     def annotation_builder(tree, array, parent_dist):
-        if tree.is_leaf:
-          array.append((parent_dist, tree.point_id, tree)) #Need to append a pointer to the tree itself because we want to mark the spots in the tree form which a point was chosen.
-          #print("Annotation:", parent_dist, tree.point_id,  self.get_leaves(tree))
-          return 0, tree.point_id, 1 #Returns local cost, the center for that cost and the size of the tree
-        else:
-           left_cost, left_center, left_size = annotation_builder(tree.left_tree, array, tree.dist)
-           right_cost, right_center, right_size =  annotation_builder(tree.right_tree, array, tree.dist)
-           total_size = left_size + right_size
-
-           cost_left_center = left_cost + right_size * tree.dist
-           cost_right_center = right_cost + left_size * tree.dist
-
-          #We do not need to keep track of whether we are in the root.
-           if cost_left_center > cost_right_center: #C_L > C_R implies higher decrease for C_R
-              cost_decrease = parent_dist* total_size - cost_right_center 
-              array.append((cost_decrease, right_center, tree))
-              #print("Annotation:", cost_decrease, right_center, self.get_leaves(tree))
-
-              return cost_right_center, right_center, total_size
-           else:
-              cost_decrease = parent_dist* total_size - cost_left_center 
-              array.append((cost_decrease, left_center, tree))
-              #print("Annotation:", cost_decrease, left_center,  self.get_leaves(tree))
-
-              return cost_left_center, left_center, total_size
-     annotation_builder(tree, output, np.inf)
-     return output
-  
-
-  def annotate_tree_kmeans(self, tree):
-     '''
-     Does bottom-up on the dc-tree, generating an array of the annotations. We do not need to keep track of which tree-node generated which annotation
-     , so the order in which they are inserted into the array does not matter. 
-     Appending to a list is amortized O(n).
-     It follows the cost_computation algorithm from my paper.
-
-     Since this is for K-means, notice that distances are squared whenever used!!
-     '''
-
-     output = []
-     def annotation_builder(tree, array, parent_dist):
-        if tree.is_leaf:
-          array.append((parent_dist**2, tree.point_id, tree)) #Need to append a pointer to the tree itself because we want to mark the spots in the tree form which a point was chosen.
-          #print("Annotation:", parent_dist, tree.point_id,  self.get_leaves(tree))
-          return 0, tree.point_id, 1 #Returns local cost, the center for that cost and the size of the tree
-        else:
-           left_cost, left_center, left_size = annotation_builder(tree.left_tree, array, tree.dist)
-           right_cost, right_center, right_size =  annotation_builder(tree.right_tree, array, tree.dist)
-           total_size = left_size + right_size
-
-           cost_left_center = left_cost + right_size * (tree.dist**2)
-           cost_right_center = right_cost + left_size * (tree.dist**2)
-
-          #We do not need to keep track of whether we are in the root.
-           if cost_left_center > cost_right_center: #C_L > C_R implies higher decrease for C_R
-              cost_decrease = (parent_dist**2) * total_size - cost_right_center 
-              array.append((cost_decrease, right_center, tree))
-              #print("Annotation:", cost_decrease, right_center, self.get_leaves(tree))
-
-              return cost_right_center, right_center, total_size
-           else:
-              cost_decrease = (parent_dist**2) * total_size - cost_left_center 
-              array.append((cost_decrease, left_center, tree))
-              #print("Annotation:", cost_decrease, left_center,  self.get_leaves(tree))
-
-              return cost_left_center, left_center, total_size
-     annotation_builder(tree, output, np.inf)
-     return output
-
 
   def kmedian_loss(self, points, centers, dc_tree):
     '''
@@ -465,7 +405,6 @@ class DCKCentroids(object):
     dists = np.array([[dc_tree.dc_dist(c,p_index) for c in centers] for p_index in range(n)])
     cluster_dists = np.min(dists, axis=1)
     loss = np.sum(cluster_dists)
-    
     return loss
 
   def kmeans_loss(self, points, centers, dc_tree):
@@ -491,6 +430,47 @@ class DCKCentroids(object):
 
     ######################## [END] Methods that are K-means / K-median specific ########################
 
+
+  def annotate_tree(self, tree):
+    '''
+    Returns the list of annotations.
+    '''
+    output = []
+    def annotation_builder(tree, array, parent_dist, loss):
+        if tree.is_leaf:
+            array.append((loss(parent_dist), tree.point_id, tree)) #Need to append a pointer to the tree itself because we want to mark the spots in the tree form which a point was chosen.
+            #print("Annotation:", parent_dist, tree.point_id,  self.get_leaves(tree))
+            return 0, tree.point_id, 1 #Returns local cost, the center for that cost and the size of the tree
+        else:
+            left_cost, left_center, left_size = annotation_builder(tree.left_tree, array, tree.dist)
+            right_cost, right_center, right_size =  annotation_builder(tree.right_tree, array, tree.dist)
+            total_size = left_size + right_size
+
+            cost_left_center = left_cost + right_size * loss(tree.dist)
+            cost_right_center = right_cost + left_size * loss(tree.dist)
+
+            #We do not need to keep track of whether we are in the root.
+            if cost_left_center > cost_right_center: #C_L > C_R implies higher decrease for C_R
+                cost_decrease = loss(parent_dist) * total_size - cost_right_center 
+                array.append((cost_decrease, right_center, tree))
+                #print("Annotation:", cost_decrease, right_center, self.get_leaves(tree))
+
+                return cost_right_center, right_center, total_size
+            else:
+                cost_decrease = loss(parent_dist) * total_size - cost_left_center 
+                array.append((cost_decrease, left_center, tree))
+                #print("Annotation:", cost_decrease, left_center,  self.get_leaves(tree))
+
+                return cost_left_center, left_center, total_size
+            
+    if self.loss == "kmedian":
+       annotation_builder(tree, output, np.inf, lambda x: x) #Using K-median loss
+    elif self.loss == "kmeans":
+       annotation_builder(tree, output, np.inf, lambda x: x**2) #Using K-means loss
+    return output
+
+
+
   def get_leaves(self, dc_tree):
         '''
         Returns the set of ids of the leaf nodes within the given cluster.
@@ -503,12 +483,12 @@ class DCKCentroids(object):
             return self.get_leaves(dc_tree.left_tree) + self.get_leaves(dc_tree.right_tree)
   
     
-  
   def prune_annotations(self, annotations):
      '''
      This removes any centers that only have a path of length 1 before another center trumps it in cost-decrease.
      It returns the pruned list of annotations.
      Since we use a counter instead of a boolean this is easily extendable to prune paths of length < l. 
+     Annotations are built up as 
      '''
 
      annotations.sort(reverse=True, key=lambda x : x[1]) #Sort by the centers
@@ -535,6 +515,25 @@ class DCKCentroids(object):
      #print("annotations:", [annotation[1] for annotation in new_annotations])
 
      return new_annotations
+  
+  def prune_annotations_other(self, tree, annotations):
+     '''
+     The annotations are built up as a list of [(cost-decrease, center, tree),...]
+     TODO: Make sure that the ordering of the pruned annotations is still kept and not reversed. 
+     '''
+     points, _ = self.prune_cluster_subtree(tree, self.min_pts) #This is one option... however this will not prune below splits, which might not be ideal. 
+     #points, _ = self.prune_cluster_subtree_aggressive(tree, self.min_pts)
+     point_set = set(points)
+     pruned_annotations = []
+     for annotation in annotations:
+        center = annotation[1]
+        if center in point_set:
+            pruned_annotations.append(annotation)
+     print("annotations:", [(annotation[0], annotation[1]) for annotation in annotations])
+     return pruned_annotations
+  
+
+     
 
   def normalize_cluster_ordering(self, cluster_labels):
       '''
@@ -564,7 +563,3 @@ class DCKCentroids(object):
 
       #print("cluster_labels after:", norm_cluster_labels)
       return norm_cluster_labels
-  
-  
-
-
