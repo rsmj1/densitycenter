@@ -4,13 +4,11 @@ from sklearn.decomposition import KernelPCA
 import networkx as nx
 import numpy as np
 import matplotlib.pyplot as plt
-from enum import Enum
 import numba as numba
-from density_tree import make_tree
-from tree_plotting import make_node_lists, find_node_positions
 from datetime import datetime
 from matplotlib.widgets import Button, RadioButtons, CheckButtons
-
+from density_tree import DensityTree
+from n_density_tree import NaryDensityTree
 
 def visualize_embedding(dists, names, distance, labels = None):
   '''
@@ -278,7 +276,6 @@ def get_cdists(points, min_pts):
     return cdists
 
 
-
 #Currently creates edges for a complete graph
 def create_edges(distance_matrix, num_neighbors = None):
   #print("dist matrix:", distance_matrix)
@@ -296,7 +293,7 @@ def create_edges(distance_matrix, num_neighbors = None):
     ###########################################
 
 
-def find_node_positions(root, width=1, vert_gap=0.2, vert_loc=0, xcenter=0.5, pos=None):
+def find_node_positions_nary(root, width=1, vert_gap=0.2, vert_loc=0, xcenter=0.5, pos=None):
     if pos is None:
         pos = [[xcenter, vert_loc]]
     else:
@@ -305,7 +302,7 @@ def find_node_positions(root, width=1, vert_gap=0.2, vert_loc=0, xcenter=0.5, po
         dx = width / root.num_children
         curr_x = xcenter - (dx*(root.num_children-1)/2)
         for child in root.children:
-          pos = find_node_positions(
+          pos = find_node_positions_nary(
              child,
              width = dx,
              vert_gap=vert_gap,
@@ -316,7 +313,7 @@ def find_node_positions(root, width=1, vert_gap=0.2, vert_loc=0, xcenter=0.5, po
           curr_x += dx
     return pos
 
-def make_node_lists(root, point_labels, parent_count, dist_list, edge_list, color_list, alpha_list, edgecolor_list, dist_dict, centers=None):
+def make_node_lists_nary(root, point_labels, parent_count, dist_list, edge_list, color_list, alpha_list, edgecolor_list, dist_dict, centers=None):
     count = parent_count
     if root.dist > 0:
         dist_list.append(root.dist)
@@ -348,6 +345,82 @@ def make_node_lists(root, point_labels, parent_count, dist_list, edge_list, colo
     for tree in root.children:
         if tree is not None:
             edge_list.append((parent_count, count+1))
+            count = make_node_lists_nary(
+                tree,
+                point_labels,
+                count+1,
+                dist_list,
+                edge_list,
+                color_list,
+                alpha_list,
+                edgecolor_list,
+                dist_dict,
+                centers
+            )
+
+    return count
+
+
+def find_node_positions(root, width=1, vert_gap=0.2, vert_loc=0, xcenter=0.5, pos=None):
+    if pos is None:
+        pos = [[xcenter, vert_loc]]
+    else:
+        pos.append([xcenter, vert_loc])
+    if root.left_tree is not None and root.right_tree is not None:
+        dx = width / 2
+        left_x = xcenter - dx / 2
+        right_x = left_x + dx
+        pos = find_node_positions(
+            root.left_tree,
+            width=dx,
+            vert_gap=vert_gap, 
+            vert_loc=vert_loc-vert_gap,
+            xcenter=left_x,
+            pos=pos,
+        )
+        pos = find_node_positions(
+            root.right_tree,
+            width=dx,
+            vert_gap=vert_gap, 
+            vert_loc=vert_loc-vert_gap,
+            xcenter=right_x,
+            pos=pos,
+        )
+
+    return pos
+
+def make_node_lists(root, point_labels, parent_count, dist_list, edge_list, color_list, alpha_list, edgecolor_list, dist_dict, centers=None):
+    count = parent_count
+    if root.dist > 0:
+        dist_list.append(root.dist)
+    else: 
+        dist_list.append(root.point_id+1)
+    if root.is_leaf:
+        if root.point_id == -2:
+            color_list.append(0)
+        else:
+            color_list.append(point_labels[root.point_id])
+            alpha_list.append(1)
+            if centers is not None:
+                if root.point_id in centers:
+                    edgecolor_list.append("red")
+                elif point_labels[root.point_id] != -1:
+                    edgecolor_list.append("black")
+                else: 
+                    edgecolor_list.append("yellow")
+            else: 
+                if point_labels[root.point_id] != -1: #Non-noise points
+                    edgecolor_list.append("black")
+                else: #Noise points:
+                    edgecolor_list.append("yellow")
+    else:
+        color_list.append(-1)
+        alpha_list.append(0.5)
+        edgecolor_list.append("black")
+
+    for tree in [root.left_tree, root.right_tree]:
+        if tree is not None:
+            edge_list.append((parent_count, count+1))
             count = make_node_lists(
                 tree,
                 point_labels,
@@ -363,19 +436,22 @@ def make_node_lists(root, point_labels, parent_count, dist_list, edge_list, colo
 
     return count
 
-def plot_nary_tree(root, labels, centers=None, save=False, save_name=None):
+
+def plot_tree(root, labels=None, centers=None, save=False, save_name=None, is_binary=True):
     '''
     Plots the dc-dist tree, optionally highligthing nodes chosen as centers with a red outline. Shows the node indexes on the leaves and dc-distances in the non-leaf nodes. The leaves are color-coded by the provided labels.
     A yellow outline means that a node was labelled noise. 
     Parameters
     ----------
-
     root : DensityTree
     labels : Numpy.Array
     centers : Numpy.Array, default=None
     save : Boolean, default=False
     save_name : String, default=None
     '''
+    if labels is None:
+       labels = np.arange(root.size)
+
     dist_dict = {}
 
     edge_list = []
@@ -383,10 +459,18 @@ def plot_nary_tree(root, labels, centers=None, save=False, save_name=None):
     color_list = []
     alpha_list = []
     edgecolor_list = []
-    make_node_lists(root, labels, 1, dist_list, edge_list, color_list, alpha_list, edgecolor_list, dist_dict, centers)
+
+    if is_binary:
+      assert isinstance(root, DensityTree), "is_binary is True so expected a root of class DensityTree"
+      make_node_lists(root, labels, 1, dist_list, edge_list, color_list, alpha_list, edgecolor_list, dist_dict, centers)
+      pos_list = find_node_positions(root, 10)
+    else:   
+      assert isinstance(root, NaryDensityTree), "is_binary is False so expected a root of class NaryDensityTree"
+      make_node_lists_nary(root, labels, 1, dist_list, edge_list, color_list, alpha_list, edgecolor_list, dist_dict, centers)
+      pos_list = find_node_positions_nary(root, 10)
+
     G = nx.Graph()
     G.add_edges_from(edge_list)
-    pos_list = find_node_positions(root, 10)
 
     pos_dict = {}
     for i, node in enumerate(G.nodes):
@@ -394,57 +478,18 @@ def plot_nary_tree(root, labels, centers=None, save=False, save_name=None):
         #+1 for {:.0f} as these are the node numbers which are 0 indexed from the point_ids in the tree, but are 1-indexed in the other visualizations.
         dist_dict[node] = '{:.2f}'.format(dist_list[i]) if dist_list[i] % 1 != 0 else '{:.0f}'.format(dist_list[i])
 
-    
-    plt.title("dc-distance tree with n=" + str(len(labels)))
+    if is_binary:  
+      plt.title("binary dc-distance tree with " + str(len(labels)) + " points")
+    else:
+      plt.title("n-ary dc-distance tree with " + str(len(labels)) + " points")
     
     nx.draw_networkx_nodes(G, pos=pos_dict, node_color=color_list, alpha=alpha_list, edgecolors=edgecolor_list, linewidths=1.5)
     nx.draw_networkx_edges(G, pos=pos_dict)
     nx.draw_networkx_labels(G, pos=pos_dict, labels=dist_dict, font_size=8)
     
-
     if save:
         if save_name is None:
             save_name = str(datetime.now())
         plt.savefig("savefiles/images/"+save_name+"_tree.png")
 
     plt.show()
-
-
-
-
-
-
-
-
-def main():
-    samples = 6
-    minPts = 2
-    #Choose point distribution
-    points, labels = make_moons(n_samples=samples, noise=0.1)
-    #points, labels = make_blobs(n_samples=samples, centers=2)
-
-
-    # root, dc_dists = make_tree(
-    #     points,
-    #     labels,
-    #     min_points=minPts,
-    #     make_image=True,
-    #     n_neighbors=minPts
-    # )
-
-
-
-
-    #Choose distance function
-    dist = "mut_reach"
-    #dist = "euclidean"
-    #dist = "dc_dist"
-
-
-    print("points: \n", points)
-
-    #get_cdists(points, 3)
-    visualize(points=points, cluster_labels=labels, embed=True, distance=dist, minPts=minPts, show_cdists=True)
-    #print_numpy_code(points)
-
-#main()

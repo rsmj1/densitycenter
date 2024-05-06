@@ -1,19 +1,19 @@
 import numpy as np
 from distance_metric import get_dc_dist_matrix
-from tree_plotting import plot_tree
 import matplotlib.pyplot as plt
 
 import sys
 sys.setrecursionlimit(2000)
 
 class DensityTree:
-    def __init__(self, dist, orig_node=None, path='', parent=None):
+    def __init__(self, dist, orig_node=None, path='', parent=None, size=None):
         self.dist = dist
         self.children = []
         self.left_tree = None
         self.right_tree = None
         self.label = None
         self.point_id = None
+        self.size = size
 
         #For efficient greedy
         self.best_center = None
@@ -90,7 +90,7 @@ def get_inds(all_dists, largest_dist):
 
 def _make_tree(all_dists, labels, point_ids, path=''):
     largest_dist = np.max(all_dists)
-    root = DensityTree(largest_dist)
+    root = DensityTree(largest_dist, size=all_dists.shape[0])
     root.path = path
 
     # TODO -- this will break if multiple copies of the same point. Need to first check for equal point
@@ -116,25 +116,16 @@ def _make_tree(all_dists, labels, point_ids, path=''):
     root.count_children()
     return root
 
-def make_tree(points, labels, min_points=1, make_image=False, point_ids=None):
+def make_tree(points, labels=None, min_points=1, point_ids=None):
     #TODO make labels optional...
-    assert len(points.shape) == 2
+    assert len(points.shape) == 2 #Check that we get a 2D matrix of points
     if len(np.unique(points, axis=0)) < len(points):
         raise ValueError('Currently not supported to have multiple duplicates of the same point in the dataset')
-    dc_dists = get_dc_dist_matrix(
-        points,
-        min_points=min_points
-    )
-
+    
+    dc_dists = get_dc_dist_matrix(points, min_points=min_points)
     if point_ids is None:
         point_ids = np.arange(int(dc_dists.shape[0]))
 
     root = _make_tree(dc_dists, labels, point_ids)
-    #print("root:", root)
-    if make_image and labels is not None:
-        plot_tree(root, labels)
 
     return root, dc_dists
-
-
-

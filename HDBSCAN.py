@@ -159,7 +159,8 @@ class HDBSCAN(object):
                 # print("nodes:", np.array(self.get_leaves(dc_tree))[:num_nodes]+1)
                 # print("w/ var:", var,"bar", bar,"dists_size", dsize,"set_size", ssize)
                 if var == 0 or bar == 0:
-                    print("stability:", 0)
+                    #print("stability:", 0)
+                    pass
                 else:
                     nodes = self.get_leaves(dc_tree)
                                     

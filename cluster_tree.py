@@ -120,15 +120,7 @@ def get_leaves(dc_tree):
         #print("right:", self.get_tree_size(dc_tree.right_tree))
         return get_leaves(dc_tree.left_tree) + get_leaves(dc_tree.right_tree)
 
-def nary_dc_tree(dc_tree):
-    '''
-    Makes the binary dc-tree into an n-ary tree instead. 
-    This alleviates any inconsistencies in terms of the construction of the tree.
-    There are multiple correct MSTs which means that there are also multiple correct binary dc-trees. This might lead to inconsistencies. 
-    '''
 
-    
-    return
 
 
 def count_equidist(dc_tree, dist):

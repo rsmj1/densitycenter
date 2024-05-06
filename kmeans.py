@@ -1,11 +1,11 @@
 import efficientdcdist.dctree as dcdist
 import numpy as np
 from density_tree import make_tree
-
+from cluster_tree import prune_tree
 
 class DCKMeans(object):
 
-  def __init__(self, *, k, min_pts, method="optimal", max_iters=100):
+  def __init__(self, *, k, min_pts, method="optimal", max_iters=100, noise_mode="none"):
         self.k = k # The number of clusters that the given kmeans algorithm chosen will use
         self.min_pts = min_pts
         self.method = method # The methods are "naive", "plusplus", "hungry"
@@ -14,6 +14,7 @@ class DCKMeans(object):
         self.labels_ = None #the kmeans applied will put the cluster labels here
         self.centers = None #The point values of the centers
         self.center_indexes = None #The point indexes in the point list of the centers
+        self.noise_mode = noise_mode #The execution mode - either no noise detection, "medium" noise detection or full noise detection
 
 
   def fit(self, points):
@@ -157,12 +158,10 @@ class DCKMeans(object):
 
   def kmeans_loss(self, points, centers, dc_tree):
     '''
-    Computes the K-means loss, given k provided centers: 
-      Sum for each point in points: dist from point to closest center squared
+    Computes the K-means loss, given k provided centers: Sum for each point in points: dist from point to closest center squared.
     
     Parameters
     ----------
-
     points : Numpy.array
       The set of points over which the loss is computed.
     
@@ -176,7 +175,6 @@ class DCKMeans(object):
     dists = np.array([[dc_tree.dc_dist(c,p_index) for c in centers] for p_index in range(n)])
     cluster_dists = np.min(dists, axis=1)
     loss = np.sum(cluster_dists**2)
-    
     return loss
 
   def hungry_kmeans_loss(self, points, cluster_center_indexes, dc_tree):
@@ -279,6 +277,11 @@ class DCKMeans(object):
      dc_tree, _ = make_tree(points, placeholder, min_points=self.min_pts, )
      annotations = self.annotate_tree(dc_tree)
 
+    
+     if self.noise_mode == "medium" or self.noise_mode == "full":
+         #This is to avoid picking noise points as centers
+         annotations = self.prune_annotations(annotations)
+
      annotations.sort(reverse=True, key=lambda x : x[0]) #Sort by the first value of the tuples - the potential cost-decrease. Reverse=True to get descending order.
      cluster_centers = set() # We should not use the "in" operation, as it is a worst-case O(n) operation. Just add again and again
 
@@ -291,10 +294,21 @@ class DCKMeans(object):
         if curr_len != new_len: #This janky setup is to make sure we do not need to use the "in" operation which has a worst-case O(n) complexity
            annotation[2].chosen = True
            annotation[2].best_center = annotation[1] 
-     # Now we just need to assign the points to the clusters.
-     self.labels_ = self.assign_points_eff(points, dc_tree)
-     print("labels:", self.labels_)
+
+     #Now we just need to assign the points to the clusters.
      centers = list(cluster_centers)
+     if self.noise_mode == "none":
+        self.labels_ = self.assign_points_eff(points, dc_tree)
+     elif self.noise_mode == "medium":
+        self.mark_paths(dc_tree, centers)
+        self.labels_ = self.assign_points_prune(points, dc_tree)
+     elif self.noise_mode == "full":
+        self.mark_paths(dc_tree, centers)
+        self.labels_ = self.assign_points_prune_full(points, dc_tree)        
+     else: 
+        raise AssertionError("The noise detection mode is not recognized. Choose between none, medium or full.")
+     
+     print("labels:", self.labels_)
      self.center_indexes = centers
      self.centers = points[centers]
      return
@@ -350,6 +364,195 @@ class DCKMeans(object):
             #print("right:", self.get_tree_size(dc_tree.right_tree))
             return self.get_leaves(dc_tree.left_tree) + self.get_leaves(dc_tree.right_tree)
   
+  def assign_points_prune(self, points, dc_tree):
+     '''
+     This method assigns all points that have the same distance to multiple centers to noise.
+
+     Thought TODO: If we prune the tree and smooth out (remove internal nodes where no left/right child is left), then feasibly one could run K-median on it. 
+     This might be equivalent to the pruning of the output list of annotations(?)
+     '''
+     output = []
+
+     def list_builder(dc_tree, list):
+        '''
+        Inefficient implementation for now - proof of concept.
+        Helper method that does the recursive list building.
+        Returns a list of tuples with the points and the center they are assigned to. 
+        '''
+        if dc_tree.is_leaf:
+            if dc_tree.center_path:
+              print("here2")
+
+              list.append((dc_tree.point_id, dc_tree.unique_center))
+              return []
+            else:
+               return [dc_tree.point_id]
+        else:
+            left_not_assigned = list_builder(dc_tree.left_tree, list)
+            right_not_assigned = list_builder(dc_tree.right_tree, list)
+
+            all_not_assigned = left_not_assigned + right_not_assigned
+            if dc_tree.center_path: #On center path they should be assigned
+               print("here1")
+               if dc_tree.num_centers == 1:
+                  for p in all_not_assigned:
+                     list.append((p, dc_tree.unique_center))
+               else: #Not uniquely close to one center
+                  for p in all_not_assigned:
+                     list.append((p, -1))
+               return []
+            else: #Not on center path - cannnot be assigned yet
+               return all_not_assigned
+
+
+     list_builder(dc_tree, output)
+     print("output:", output)
+     n = points.shape[0]
+
+     labels = np.zeros(n)
+     for tup in output:
+      i = tup[0]
+      label = tup[1]
+      labels[i] = label
+     labels = normalize_cluster_ordering(labels) #THIS STEP IS NOT O(n) DUE TO USING SET IN 
+     print("labels:", labels)
+     return labels
+        
+
+
+  def assign_points_prune_full(self, points, dc_tree):
+     '''
+     This method assigns all points that have the same distance to multiple centers to noise.
+
+     Thought TODO: If we prune the tree and smooth out (remove internal nodes where no left/right child is left), then feasibly one could run K-median on it. 
+     This might be equivalent to the pruning of the output list of annotations(?)
+     '''
+     output = []
+
+     def list_builder(dc_tree, list):
+        '''
+        Inefficient implementation for now - proof of concept.
+        Helper method that does the recursive list building.
+        Returns 0 from a single-center path and 1 from an "unknown" path, and 2 from a multi-center path.
+        '''
+        if dc_tree.is_leaf:
+            if dc_tree.center_path:
+              return 0
+            else:
+               return 1
+        else:
+            left_path= list_builder(dc_tree.left_tree, list)
+            right_path = list_builder(dc_tree.right_tree, list)
+
+            if dc_tree.center_path: #On center path they should be assigned
+
+               if dc_tree.num_centers == 1:
+                  return 0
+               else: #Not uniquely close to one center
+                  #Now, those points that come from a single-center path should now be pruned together via external method.
+                  #Those that don't should be assigned to noise
+                  points, noise = [],[]
+                  if left_path == 0:
+                     points, noise = self.prune_cluster_subtree(dc_tree.left_tree, self.min_pts)
+                     center = dc_tree.left_tree.unique_center
+                     for point in points:
+                        list.append((point, center))  
+                     for point in noise:
+                        list.append((point, -1))
+                  elif left_path == 1:
+
+                     noise = self.get_leaves(dc_tree.left_tree)
+                     for point in noise:
+                        list.append((point, -1))
+                     #Assign to noise
+
+                  if right_path == 0:
+                     points, noise = self.prune_cluster_subtree(dc_tree.right_tree, self.min_pts)
+                     center = dc_tree.right_tree.unique_center
+                     for point in points:
+                        list.append((point, center)) 
+                     for point in noise:
+                        list.append((point, -1))
+                  elif right_path == 1:
+                     noise = self.get_leaves(dc_tree.right_tree)
+                     for point in noise:
+                        list.append((point, -1))    
+                  
+                  return 2 #Return false here - 
+            
+            else: #Not on center path - cannnot be assigned yet
+               return 1
+
+     list_builder(dc_tree, output)
+     n = points.shape[0]
+
+     labels = np.zeros(n)
+     for tup in output:
+      i = tup[0]
+      label = tup[1]
+      labels[i] = label
+     labels = normalize_cluster_ordering(labels) #THIS STEP IS NOT O(n) DUE TO USING SET IN 
+     return labels
+
+
+  def prune_cluster_subtree(self, dc_tree, min_pts):
+   '''
+   Will prune the tree and return the points that should be pruned and those that should be assigned.
+   '''
+   pruned_tree = prune_tree(dc_tree, min_pts)
+
+   def noise_collector(tree, points_list, noise_list):
+      if tree.is_leaf:
+         if tree.point_id < 0: #This is noise
+            noise_list += self.get_leaves(tree.orig_node)
+            return
+         else:
+            points_list += [tree.point_id]
+      else:
+         l_point_id = tree.left_tree.point_id
+         r_point_id = tree.right_tree.point_id
+         if l_point_id is None and r_point_id is None: #If these are none they are internal nodes - ergo we have a split in the pruned tree.
+            points_list += self.get_leaves(tree.orig_node)
+            return
+         
+         noise_collector(tree.left_tree, points_list, noise_list)
+         noise_collector(tree.right_tree, points_list, noise_list)
+
+   points, noise = [],[]
+
+   if pruned_tree is None: #If everything is pruned
+      noise += self.get_leaves(dc_tree)
+   else:
+      noise_collector(pruned_tree, points, noise)
+
+   return points, noise
+
+
+
+
+  def mark_paths(self, dc_tree, centers):
+     '''
+     Inefficient implementation - it is n^2
+     This marks in the tree the paths from the centers and how many centers are on overlapping paths.
+     '''
+     if dc_tree.is_leaf:
+        if dc_tree.point_id in centers:
+           dc_tree.center_path = True
+           dc_tree.num_centers = 1
+           dc_tree.unique_center = dc_tree.point_id
+           return [dc_tree.point_id]
+        return []
+     else:
+        left_path = self.mark_paths(dc_tree.left_tree, centers)
+        right_path = self.mark_paths(dc_tree.right_tree, centers)
+        union_path = left_path + right_path
+        num_centers = len(union_path)
+        if num_centers > 0:
+           dc_tree.center_path = True
+           dc_tree.num_centers = num_centers
+           dc_tree.unique_center = union_path[0]
+        return union_path
+     
 
 
 def normalize_cluster_ordering(cluster_labels):
@@ -380,37 +583,3 @@ def normalize_cluster_ordering(cluster_labels):
 
     #print("cluster_labels after:", norm_cluster_labels)
     return norm_cluster_labels
-
-
-#Basic testing:
-#points = np.array([[1,6],[2,6],[6,2],[14,17],[123,3246],[52,8323],[265,73]])
-#points = np.array([[1,1],[2,2], [3,3], [3,2], [1,2], 
-#                   [15,15],[16,16], [17,17], [17,15], [17,16]])
-
-#kmeans = KMEANS(k=2)
-#kmeans.plusplus_dc_kmeans(points=points, minPts=2, max_iters=5)
-#kmeans.naive_dc_kmeans(points=points, minPts=2, max_iters=5)
-
-
-
-
-
-'''
- Examples
-    --------
-    >>> import dcdist
-    >>> points = np.array([[1,6],[2,6],[6,2],[14,17],[123,3246],[52,8323],[265,73]])
-    >>> dc_tree = dcdist.DCTree(points, 5)
-    >>> print(dc_tree.dc_dist(2,5))
-    >>> print(dc_tree.dc_distances(range(len(points))))
-    >>> print(dc_tree.dc_distances([0,1], [2,3]))
-
-    >>> s = dcdist.serialize(dc_tree)
-    >>> dc_tree_new = dcdist.deserialize(s)
-
-    >>> b = dcdist.serialize_compressed(dc_tree)
-    >>> dc_tree_new = dcdist.deserialize_compressed(b)
-
-    >>> dcdist.save(dc_tree, "./data.dctree")
-    >>> dc_tree_new = dcdist.load("./data.dctree")
-'''

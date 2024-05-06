@@ -15,12 +15,10 @@ from distance_metric import get_dc_dist_matrix
 from density_tree import make_tree
 from n_density_tree import make_n_tree
 
-
 from tree_plotting import plot_embedding
-from tree_plotting import plot_tree
 from cluster_tree import dc_clustering
 from point_gen import create_hierarchical_clusters
-from visualization import visualize, plot_nary_tree
+from visualization import visualize, plot_tree
 from benchmark import create_dataset
 from benchmark import normalize_cluster_ordering
 from cluster_tree import copy_tree, prune_tree
@@ -35,6 +33,7 @@ from kmeans import DCKMeans
 from kmedian import DCKMedian
 from DBSCAN import DBSCAN
 from HDBSCAN import HDBSCAN as newScan
+from kcentroids import DCKCentroids
 
 
 if __name__ == '__main__': 
@@ -75,8 +74,6 @@ if __name__ == '__main__':
 
     #################### RUN PARAMETERS END  #######################
 
-
-
     #Create the dataset and old dc_tree setup for methods that need it as input
     #Exposing parameters for this example are min_pts = 3, mcs = 2
     #Showing how noise clusters are a thing to be avoided and how we have a weird exception for the root cluster.
@@ -96,7 +93,6 @@ if __name__ == '__main__':
                        )
     labels = np.array([0,1,2,3,4,5,6,7,8,9,10,11])
 
-
     #Interesting example with min_pts = 3, mcs = 2 - shows a potential bug for sklearn HDBSCAN.
     # points = np.array([[1,2],
     #                    [1,4],
@@ -113,9 +109,6 @@ if __name__ == '__main__':
     #                    ]
     #                    )
     # labels = np.array([0,1,2,3,4,5,6,7,8,9,10,11])
-    # labels = np.array([0,1,2,3,4,5,6,7,8,9,10,11])
-
-
 
     points = np.array([[1,2],
                        [1,4],
@@ -137,24 +130,19 @@ if __name__ == '__main__':
                        ]
                        )
     labels = np.array([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16])
+    
     #points, labels = create_dataset(num_points=num_points, type=dataset_type, save=save_dataset, load=load_dataset, save_name=save_name, load_name=load_name)
 
 
     t1 = time.time()
-    root, dc_dists = make_tree(
-    points,
-    labels,
-    min_points=min_pts,
-    make_image=plot_tree_bool
-    )
+    root, dc_dists = make_tree(points, labels, min_points=min_pts)
     t2 = time.time()
     n_root,_ = make_n_tree(points, None, min_points=min_pts)
-    
     t3 = time.time()
 
-    print("bin dctree:", t2-t1)
+    print("binary dctree time:", t2-t1)
 
-    print("nary dctree:", t3-t2)
+    print("nary dctree time  :", t3-t2)
     #K-center
     pred_labels, kcenter_centers, epsilons = dc_clustering(root, num_points=len(labels), k=k, min_points=min_pts,with_noise=True)
 
@@ -162,15 +150,15 @@ if __name__ == '__main__':
 
 
     #K-means clustering
-    kmeans = DCKMeans(k=k, min_pts=min_pts)
-    kmeans.plusplus_dc_kmeans(points=points, minPts=min_pts, max_iters=100)
+    kmeans = DCKCentroids(k=k, min_pts=min_pts, loss="kmeans", noise_mode="none")
+    kmeans.fit(points)
 
     kmeans_labels = kmeans.labels_
     centers = kmeans.centers
     
 
     #K-median clustering
-    kmedian = DCKMedian(k=k, min_pts=min_pts)
+    kmedian = DCKCentroids(k=k, min_pts=min_pts, loss="kmedian", noise_mode="none")
     kmedian.fit(points)
 
     kmedian_labels = kmedian.labels_
@@ -201,7 +189,7 @@ if __name__ == '__main__':
     
     
     #Kmeans using same number of clusters as hdbscan finds
-    kmeans_hk = DCKMeans(k=num_clusters, min_pts=min_pts)
+    kmeans_hk = DCKCentroids(k=k, min_pts=min_pts, loss="kmeans", noise_mode="none")
     kmeans_hk.plusplus_dc_kmeans(points=points, minPts=min_pts, max_iters=100)
     kmeans_labels_hk = kmeans_hk.labels_
 
@@ -227,11 +215,11 @@ if __name__ == '__main__':
         # plot_tree(root, hdb_new_labels, None, save=save_visualization, save_name=image_save_name)
         # plot_tree(root, hdb_labels, None, save=save_visualization, save_name=image_save_name)
 
-
         #K-median dc-tree labellings:
         #root.dist = 500
-        plot_tree(root, kmedian_labels, kmedian_centers, save=save_visualization, save_name=image_save_name)
-        plot_nary_tree(n_root, kmedian_labels, kmedian_centers, save=save_visualization, save_name=image_save_name)
+        kmedian_labels = None
+        plot_tree(root, kmedian_labels, kmedian_centers, save=save_visualization, save_name=image_save_name, is_binary=True)
+        plot_tree(n_root, kmedian_labels, kmedian_centers, save=save_visualization, save_name=image_save_name, is_binary=False)
         #Plot the dc-tree, optionally with the centers from the final kmeans clusters marked in red
         #plot_tree(root, kmeans_labels, kmeans.center_indexes, save=save_visualization, save_name=image_save_name)
         #plot_tree(root, hdb_labels, None, save=save_visualization, save_name=image_save_name)
@@ -253,7 +241,6 @@ if __name__ == '__main__':
         centers=centers,
         dot_scale=1
     )
-
 
     plot_embedding(
         plot_points,

@@ -1,19 +1,18 @@
 import numpy as np
-from distance_metric import get_dc_dist_matrix
-from tree_plotting import plot_tree
-import matplotlib.pyplot as plt
 import numba as nb
-from visualization import plot_nary_tree
+from distance_metric import get_dc_dist_matrix
 import sys
 sys.setrecursionlimit(2000)
 
 class NaryDensityTree:
-    def __init__(self, dist, orig_node=None, parent=None, point_id=None, label=None):
+    def __init__(self, dist, orig_node=None, parent=None, point_id=None, label=None, size=None):
         self.dist = dist
         self.children = []
 
         self.label = label
         self.point_id = point_id
+
+        self.size = size
 
         #For efficient greedy
         self.best_center = None
@@ -32,13 +31,10 @@ class NaryDensityTree:
             self.orig_node = self
         self.parent = parent
 
-
-
     @property
     def has_children(self):
         return len(self.children) != 0
     
-
     @property
     def is_leaf(self):
         return not self.has_children
@@ -58,33 +54,37 @@ class NaryDensityTree:
         self.children.append(subtree)
 
 
-
 def tree_builder(dists, labels, point_ids):
     '''
-    Inner nodes will have a distance while leaf nodes will have a distance of 0.
+    Main method for building the n-ary dc-tree. Recursively finds the next splits at each level, building the tree in recursive manner.
+    It gets the next split-values. If the group is a leaf group it makes a "leaf tree" for each, otherwise it recurses on the group.
 
-    Leaf nodes will have (n-1)*largest_dist as the sum of their row.
+    Parameters
+    ----------
+    dists : 2D numpy array
+        The distance matrix of the current set of data points the function is called on.
 
+    labels : 1D numpy array
+        The potential labels of the points.
+
+    point_ids : 1D numpy array
+        The ids of the points. 
     '''
-    #print("dists:", np.round(dists,2))
-
     largest_dist = np.max(dists[0]) #You can always find the largest distance in every row.
-    root = NaryDensityTree(largest_dist)
+    root = NaryDensityTree(largest_dist, size=dists.shape[0])
     
-    
-    split_groups = get_next_inds(dists, largest_dist) #Get the split structure for this level of the tree
+    split_groups = get_next_split(dists, largest_dist) #Get the split structure for this level of the tree
 
     for group in split_groups.values():
         is_leaf = group[0]
         inds = np.array(group[1])
-        #print("I have indices:", inds)
-        #print("leaf?", is_leaf)
+
         if is_leaf: #If the group is a "leaf group" all the indices should each be added as separate leaves from the current root.
             for i in inds:
                 if labels is None:
-                    root.add_child(NaryDensityTree(0, point_id=point_ids[i], parent=root))
+                    root.add_child(NaryDensityTree(0, point_id=point_ids[i], parent=root, size=1))
                 else:
-                    root.add_child(NaryDensityTree(0, point_id=point_ids[i], parent=root, label=labels[i]))
+                    root.add_child(NaryDensityTree(0, point_id=point_ids[i], parent=root, label=labels[i], size=1))
         else:
             recurse_dists = dists[inds][:, inds]
             recurse_labels = labels[inds] if labels is not None else None
@@ -94,24 +94,23 @@ def tree_builder(dists, labels, point_ids):
     return root
     
 
-def get_next_inds(dists, largest_dist):
+def get_next_split(dists, largest_dist):
     '''
-    Finds the next split in the tree, returning the indices of one side of the split
-    The sum is just a counter of the number of max_dists encountered. No need to sum up to introduce numerical errors in final comparison.
+    Finds the next (potentially multi) split in the tree.
+    To find the split, every "side" of the split will have max distance to the same set of other nodes - the nodes are grouped by this.
+    The distance matrix is first binarized based on the max distance. 
+    Then a dictionary of each unique bitstring row is kept, and the nodes are grouped by their bitstrings. 
+    Each group is represented by a list of [Boolean, [Nodes]], where the boolean marks whether the group is a set of leaf nodes, or further recursion should be done.
     
-    TODO: Add support for multi splits at same height - we can detect how big the split is by the amount of unique numbers of the max dist we have in the array.
-    Every set of same number of max dist will be its own subtree. 
     '''
     n = dists.shape[0]
     split_groups = {}
 
-    work_dists, leaf = binarize_array(dists, largest_dist)
+    work_dists, leaf = binarize_array(dists, largest_dist) #binarize_array returns the index of a leaf within the leaf split group (if any), otherwise leaf is -1. 
 
-    #print("work_dists:", work_dists)
     for i, row in enumerate(work_dists):
         split_group = tuple(row)
-        if split_group not in split_groups:
-            #print("split_group:", split_group)
+        if split_group not in split_groups: #New unseen split_group is added. 
             split_groups[split_group] = [False, []]
         if leaf == i:
             split_groups[split_group][0] = True
@@ -121,7 +120,9 @@ def get_next_inds(dists, largest_dist):
 @nb.njit()
 def binarize_array(arr, one_val):
     '''
-    Based on the provided one_val, it will turn the array into a binary version with ones for point to itself and dist==one_val.
+    Based on the provided one_val, it will turn the array into a binary version with ones when dist[i,j] == one_val. 
+    Leaf nodes will have ones in all entries except when i=j. In this case, these should also get a 1 added in this entry, 
+    since nodes within this group exceptionally has max_val to other nodes in its group which is not the case for other split groups. 
 
     Also checks whether there are any points that will be leaves at this level, returning true if yes, and returning one of the points that will be a leaf. 
     '''
@@ -135,7 +136,7 @@ def binarize_array(arr, one_val):
                 row_sum += 1
         if row_sum == arr.shape[0]- 1:
             leaf_index = i
-            new_arr[i,i] = 1 #If we have equidistant leaves they should all get in the same group. This only happens if they also have ones for themselves - otherwise we get 0111, 1011, 1101, 1110...
+            new_arr[i,i] = 1 #If we have equidistant leaves they should all get in the same group. This only happens if they also have ones for themselves - otherwise we get 01111, 10111, 11011, 11101...
 
     return new_arr, leaf_index
 
@@ -146,12 +147,11 @@ def make_n_tree(points, labels=None, min_points=1, point_ids=None):
 
     Parameters
     ----------
-
     points : 2D numpy Array
         The points over which to create the dc-tree.
 
     labels :  1D numpy Array, default=None
-        The labels (if any) for the points
+        The labels (if any) for the points (clustering labels)
     
     min_points : Int, default=1
         The number of points for something to be considered a core-point. This is used for computing the mutual reachability distances used for the dc-distances.
@@ -159,25 +159,14 @@ def make_n_tree(points, labels=None, min_points=1, point_ids=None):
     point_ids : 1D numpy Array, default=None
         The numbering of the points used in the leaves. 
     '''
-
     assert len(points.shape) == 2 #Check that we get a 2D matrix of points
 
     if len(np.unique(points, axis=0)) < len(points):
         raise ValueError('Currently not supported to have multiple duplicates of the same point in the dataset')
-    dc_dists = get_dc_dist_matrix(
-        points,
-        min_points=min_points
-    )
-
+    
+    dc_dists = get_dc_dist_matrix(points, min_points=min_points)
     if point_ids is None:
         point_ids = np.arange(int(dc_dists.shape[0]))
 
     root = tree_builder(dc_dists, labels, point_ids)
-
-
     return root, dc_dists
-
-
-#root, _ = make_n_tree(points, labels, min_points=3)
-
-#plot_nary_tree(root, labels)
