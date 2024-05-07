@@ -55,8 +55,8 @@ class DCKCentroids(object):
 
       if self.noise_mode == "medium" or self.noise_mode == "full":
             #This is to avoid picking noise points as centers
+            annotations1 = self.prune_annotations_other(dc_tree, annotations) #This prunes based on the pruned tree. This is always slightly less aggressive than the one below. 
             annotations = self.prune_annotations(annotations) #This prunes based on occurences in the annotation list.
-            annotations = self.prune_annotations_other(annotations) #This prunes based on the pruned tree.
 
       annotations.sort(reverse=True, key=lambda x : x[0]) #Sort by the first value of the tuples - the potential cost-decrease. Reverse=True to get descending order.
       cluster_centers = set() #We should not use the "in" operation, as it is a worst-case O(n) operation. Just add again and again
@@ -245,7 +245,7 @@ class DCKCentroids(object):
             if dc_tree.center_path:
               return 0
             else:
-               return 1
+              return 1
         else:
             left_path= list_builder(dc_tree.left_tree, list)
             right_path = list_builder(dc_tree.right_tree, list)
@@ -259,6 +259,8 @@ class DCKCentroids(object):
                   #Those that don't should be assigned to noise
                   points, noise = [],[]
                   if left_path == 0:
+                     # print("This set of points should be assigned:", self.get_leaves(dc_tree.left_tree))
+                     # print("To this center:", dc_tree.left_tree.unique_center)
                      points, noise = self.prune_cluster_subtree(dc_tree.left_tree, self.min_pts)
                      center = dc_tree.left_tree.unique_center
                      for point in points:
@@ -273,6 +275,8 @@ class DCKCentroids(object):
                      #Assign to noise
 
                   if right_path == 0:
+                     # print("This set of points should be assigned:", self.get_leaves(dc_tree.left_tree))
+                     # print("To this center:", dc_tree.left_tree.unique_center)
                      points, noise = self.prune_cluster_subtree(dc_tree.right_tree, self.min_pts)
                      center = dc_tree.right_tree.unique_center
                      for point in points:
@@ -325,8 +329,8 @@ class DCKCentroids(object):
          noise_collector(tree.right_tree, points_list, noise_list)
 
    points, noise = [],[]
-   if pruned_tree is None: #If everything is pruned
-      noise += self.get_leaves(dc_tree)
+   if pruned_tree is None: #If everything is pruned - then it should return the nodes - it does not make sense that everything is noise.. TODO
+      points += self.get_leaves(dc_tree)
    else:
       noise_collector(pruned_tree, points, noise)
 
@@ -442,8 +446,8 @@ class DCKCentroids(object):
             #print("Annotation:", parent_dist, tree.point_id,  self.get_leaves(tree))
             return 0, tree.point_id, 1 #Returns local cost, the center for that cost and the size of the tree
         else:
-            left_cost, left_center, left_size = annotation_builder(tree.left_tree, array, tree.dist)
-            right_cost, right_center, right_size =  annotation_builder(tree.right_tree, array, tree.dist)
+            left_cost, left_center, left_size = annotation_builder(tree.left_tree, array, tree.dist, loss)
+            right_cost, right_center, right_size =  annotation_builder(tree.right_tree, array, tree.dist, loss)
             total_size = left_size + right_size
 
             cost_left_center = left_cost + right_size * loss(tree.dist)
@@ -512,24 +516,28 @@ class DCKCentroids(object):
         #print("removed", curr_center)
         to_remove.add(curr_center)
      new_annotations = [annotation for annotation in annotations if annotation[1] not in to_remove]
+     #print("Anno size:", len(new_annotations))
      #print("annotations:", [annotation[1] for annotation in new_annotations])
-
      return new_annotations
   
   def prune_annotations_other(self, tree, annotations):
      '''
      The annotations are built up as a list of [(cost-decrease, center, tree),...]
-     TODO: Make sure that the ordering of the pruned annotations is still kept and not reversed. 
      '''
-     points, _ = self.prune_cluster_subtree(tree, self.min_pts) #This is one option... however this will not prune below splits, which might not be ideal. 
-     #points, _ = self.prune_cluster_subtree_aggressive(tree, self.min_pts)
+     #points, _ = self.prune_cluster_subtree(tree, self.min_pts) #This is one option... however this will not prune below splits, which might not be ideal. 
+     points, _ = self.prune_cluster_subtree_aggressive(tree, self.min_pts)
      point_set = set(points)
+     #print("point_set:", point_set)
      pruned_annotations = []
      for annotation in annotations:
         center = annotation[1]
         if center in point_set:
             pruned_annotations.append(annotation)
-     print("annotations:", [(annotation[0], annotation[1]) for annotation in annotations])
+    
+     #Sorting just for the print:
+     pruned_annotations.sort(reverse=True, key=lambda x : x[1]) #Sort by the centers
+     #print("Other size:", len(pruned_annotations))
+     #print("annotations other:", [annotation[1] for annotation in pruned_annotations])
      return pruned_annotations
   
 

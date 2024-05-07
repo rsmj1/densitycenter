@@ -30,7 +30,7 @@ class HDBSCAN(object):
 
     '''
 
-    def __init__(self, *, min_pts, min_cluster_size=1, allow_single_cluster=False):
+    def __init__(self, *, min_pts, min_cluster_size=1, allow_single_cluster=False, tree=None):
         '''
         
         Parameters
@@ -50,7 +50,10 @@ class HDBSCAN(object):
         self.min_cluster_size = min_cluster_size
         self.labels_ = None
         self.allow_single_cluster = allow_single_cluster
-        
+
+        #Temporary var for visualization
+        self.extra_annotations = []
+        self.tree = tree #Provided tree to ensure same order traversal as visualization
 
     def get_cdists(self, points, min_pts):
         '''
@@ -107,7 +110,11 @@ class HDBSCAN(object):
 
         cdists = self.get_cdists(points, self.min_pts)
         placeholder = np.zeros(n)
-        dc_tree,_ = make_tree(points, placeholder, self.min_pts, )
+        if self.tree is None: #Important this assumes that the tree provided is for the correct points!!
+            dc_tree,_ = make_tree(points, placeholder, self.min_pts, )
+        else:
+            dc_tree = self.tree
+
         clusterings = self.compute_clustering(dc_tree, cdists)
         labels = self.label_clusters(clusterings, n)
 
@@ -128,6 +135,11 @@ class HDBSCAN(object):
         Parent_dist is the maximal point at which the cluster exists.
         '''
         if dc_tree.is_leaf:
+            #Temporary extra code
+            var,bar,dsize = self.cluster_statistics(dc_tree)
+            new_stability = self.cluster_stability_experimental(dc_tree, var, bar, dsize, cdists)
+            self.extra_annotations.append(new_stability)
+
             if self.min_cluster_size > 1:
                 #Min cluster size is 2 here
                 return [], 0, []#This point is considered noise and fell out of the current cluster at this height
@@ -142,6 +154,10 @@ class HDBSCAN(object):
         else:
             tree_size = self.get_tree_size(dc_tree)
             if self.min_cluster_size > tree_size:
+                var,bar,dsize = self.cluster_statistics(dc_tree)
+                new_stability = self.cluster_stability_experimental(dc_tree, var, bar, dsize, cdists)
+                self.extra_annotations.append(new_stability)
+
                 return [], 0, [] #Noise
             else:
                 #Propagate down the last change in cdist since all points connected in the tree with same value correspond to one big split at one level below that parent dist that gets propagated.
@@ -149,71 +165,18 @@ class HDBSCAN(object):
                 #So what to do: The mission is to somehow only print the real clusters and nothing in between. 
                 #We do not explicitly need propagation information as the value inevitably is the same or higher at the top of the split anyways, so we cannot get the below clusters as real clusters anyways.
 
+                #Experimental stability computations:
+                var,bar,dsize = self.cluster_statistics(dc_tree)
+                new_stability = self.cluster_stability_experimental(dc_tree, var, bar, dsize, cdists)
+                self.extra_annotations.append(new_stability)
+                #End of experimental stability computations.
+
+
+
                 left_clusters, left_stability, left_last_clustering = self.compute_clustering(dc_tree.left_tree, cdists, dc_tree.dist)
                 right_clusters, right_stability, right_last_clustering = self.compute_clustering(dc_tree.right_tree, cdists, dc_tree.dist)
                     
-                var,bar,dsize,ssize = self.cluster_stability_experimental(dc_tree)
                 
-                # print("node dist: ", np.round(dc_tree.dist,2), "size", len(self.get_leaves(dc_tree)))
-                num_nodes = min(ssize, 5)
-                # print("nodes:", np.array(self.get_leaves(dc_tree))[:num_nodes]+1)
-                # print("w/ var:", var,"bar", bar,"dists_size", dsize,"set_size", ssize)
-                if var == 0 or bar == 0:
-                    #print("stability:", 0)
-                    pass
-                else:
-                    nodes = self.get_leaves(dc_tree)
-                                    
-                    cluster_sum = np.sum(1/cdists[nodes])
-                    # print("cluster_sum:", cluster_sum)
-                    # print("stability:", cluster_sum/(var))
-
-
-                    
-                    # print("")
-                    max_cdist = np.max(cdists)
-                    # print("max_cdist:", max_cdist)
-                    # print("cdists", max_cdist - cdists[nodes])
-                    other_sum = np.sum(max_cdist - cdists[nodes])
-                    # print("max_cdist:", max_cdist)
-                    # print("custer_sum:", cluster_sum)
-                    # print("other_sum:", other_sum)
-                    # print("1/var", 1/var)
-                    # print("max-var", max_cdist-var)
-                    # print("dc_tree.dist-var", dc_tree.dist - var)
-                    s1 = cluster_sum/(var)
-                    s2 = other_sum * (max_cdist - var)
-                    s3 = len(nodes)/(var/bar)
-                    s4 = 0
-                    
-                    # print("sum(1/cdist_i)/var:", s1)
-                    # print("(sum(max-cdist_i))*(max-var):", s2)
-                    # print("size / (var/mean):", s3)
-                    # print("s4:", s4)
-
-                    if dc_tree.parent is not None:
-                        pvar,pbar,pdsize,pssize = self.cluster_stability_experimental(dc_tree.parent)
-                        p_nodes = self.get_leaves(dc_tree.parent)
-                        p_cluster_sum = np.sum(1/cdists[p_nodes])
-                        p_other_sum = np.sum(max_cdist - cdists[p_nodes])
-
-                        p_s1 = p_cluster_sum/(pvar)
-                        p_s2 = p_other_sum * (max_cdist - pvar)
-                        p_s3 = len(p_nodes) /(pvar/pbar)
-                        # print("")
-                        # print("If positive, then child bigger than parent, so bigger is better, negative is bad")
-                        # print("s1d:", s1-p_s1)
-                        # print("s2d:", s2-p_s2)
-                        # print("s3d:", s3-p_s3)
-
-
-
-                    #print("")
-
-                    
-
-
-                #print("")
                 
                 if parent_dist is None: #Root call has no parent_dist.
                     if not self.allow_single_cluster:
@@ -246,7 +209,6 @@ class HDBSCAN(object):
                     # print("parent_dist:", parent_dist)
                     # print("new stability:", new_stability)
 
-
                     
                     if new_stability >= total_stability: #Should be bigger than or equal to encompass that we get all the noise points added every time.
                             return [dc_tree], new_stability, left_last_clustering + right_last_clustering
@@ -257,21 +219,42 @@ class HDBSCAN(object):
                                 return all_clusters, total_stability, all_clusters 
 
 
-    def cluster_stability_experimental(self, dc_tree):
+    def cluster_stability_experimental(self, tree, var, bar, dist_matrix_size, cdists):
+        nodes = self.get_leaves(tree)                 
+        cluster_sum_inv = np.sum(1/cdists[nodes])  
+        cluster_sum = np.sum(cdists[nodes])
+        max_cdist = np.max(cdists)
+        other_sum = np.sum(max_cdist - cdists[nodes])
+
+        mu_offset = np.mean(cdists) #Use the mean of the core-dists as an offset to fix the 0 issues. 
+
+        stability1 = cluster_sum_inv/(var + mu_offset)
+
+        stability2 = cluster_sum / (var**2 + mu_offset)
+
+        #stability3 = len(nodes)/(var/bar)        
+        print("")
+        print("Stability 1:", stability1)
+        print("Stability 2:", stability2)
+        #print("Stability 3:", stability3)
+        print("")
+
+        return stability1
+
+
+    def cluster_statistics(self, dc_tree):
         '''
-        Computes |C|/Var(D_C)
-        Currently just blindly bottom up to check values.
+        Computes the variance of the dc-distance matrix of the set of nodes and all subsets of it bottom up.
+        Returns the variance, mean and size of the distance matrix (lower triangular).
         '''
         if dc_tree.is_leaf:
-            return 0,0,0,1 #return var, bar, num_pairwise_dists, num_points
+            return 0,0,0 #return var, bar, num_pairwise_dists
         else:
-            lvar, lbar, l_dists_size, l_set_size = self.cluster_stability_experimental(dc_tree.left_tree)
-            rvar, rbar, r_dists_size, r_set_size = self.cluster_stability_experimental(dc_tree.right_tree)
-
-            new_set_size = l_set_size + r_set_size #The amount of points in the combined subtree
+            lvar, lbar, l_dists_size = self.cluster_statistics(dc_tree.left_tree)
+            rvar, rbar, r_dists_size = self.cluster_statistics(dc_tree.right_tree)
             
-            new_var, new_bar, new_dists_size = self.merge_subtree_variance(dc_tree.dist, l_dists_size, r_dists_size, lvar, rvar, lbar, rbar, l_set_size, r_set_size)
-            return new_var, new_bar, new_dists_size, new_set_size
+            new_var, new_bar, new_dists_size = self.merge_subtree_variance(dc_tree.dist, l_dists_size, r_dists_size, lvar, rvar, lbar, rbar, dc_tree.left_tree.size, dc_tree.right_tree.size)
+            return new_var, new_bar, new_dists_size
         
  
     def combined_variance(self, n,m,xvar,yvar,xbar,ybar):

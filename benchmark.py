@@ -31,6 +31,7 @@ from sklearn.cluster import HDBSCAN
 from sklearn.cluster import KMeans
 from HDBSCAN import HDBSCAN as newScan
 from kmedian import DCKMedian
+from kcentroids import DCKCentroids
 
 from point_gen import create_hierarchical_clusters
 from visualization import visualize, print_numpy_code
@@ -305,6 +306,7 @@ def benchmark(dataset_types, num_points, num_runs, runtypes, k, min_pts, eps, me
     
     runtypes : List: String
         The types of algorithms to run on the datasets. 
+        Options: HDBSCAN, HDBSCAN_NEW, DBSCAN, KMEANS, DCKMEANS, DCKMEDIAN, DCKMEANS_MED, DCKMEDIAN_MED, DCKMEANS_FULL, DCKMEDIAN_FULL
     
     metrics : List: String, default=["nmi"]
         The metrics to measure on each run on each dataset. 
@@ -525,12 +527,33 @@ def benchmark_single(points, runtype, k, min_pts, eps):
         dckmeans.fit(points)
         labels = dckmeans.labels_
         used_min_pts = min_pts
+    elif runtype == "DCKMEANS_MED":
+        dckmeans = DCKCentroids(k=k, min_pts=min_pts, loss="kmeans", noise_mode="medium")
+        dckmeans.fit(points)
+        labels = dckmeans.labels_
+        used_min_pts = min_pts
+    elif runtype == "DCKMEANS_FULL":
+        dckmeans = DCKCentroids(k=k, min_pts=min_pts, loss="kmeans", noise_mode="full")
+        dckmeans.fit(points)
+        labels = dckmeans.labels_
+        used_min_pts = min_pts
 
     elif runtype == "DCKMEDIAN":
         dckmedian = DCKMedian(k=k, min_pts=min_pts)
         dckmedian.fit(points)
         labels = dckmedian.labels_
         used_min_pts = min_pts
+    elif runtype == "DCKMEDIAN_MED":
+        dckmeans = DCKCentroids(k=k, min_pts=min_pts, loss="kmedian", noise_mode="medium")
+        dckmeans.fit(points)
+        labels = dckmeans.labels_
+        used_min_pts = min_pts
+    elif runtype == "DCKMEDIAN_FULL":
+        dckmeans = DCKCentroids(k=k, min_pts=min_pts, loss="kmedian", noise_mode="full")
+        dckmeans.fit(points)
+        labels = dckmeans.labels_
+        used_min_pts = min_pts
+
     else:
         raise AssertionError("runtype", runtype, "does not exist...")
     return labels, k, used_min_pts, used_eps

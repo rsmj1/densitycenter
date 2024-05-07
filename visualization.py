@@ -10,6 +10,10 @@ from matplotlib.widgets import Button, RadioButtons, CheckButtons
 from density_tree import DensityTree
 from n_density_tree import NaryDensityTree
 
+
+import plotly.graph_objects as go
+
+
 def visualize_embedding(dists, names, distance, labels = None):
   '''
   Visualizes the distance measure in an embedded space using MDS
@@ -437,7 +441,7 @@ def make_node_lists(root, point_labels, parent_count, dist_list, edge_list, colo
     return count
 
 
-def plot_tree(root, labels=None, centers=None, save=False, save_name=None, is_binary=True):
+def plot_tree(root, labels=None, centers=None, save=False, save_name=None, is_binary=True, extra_annotations=None):
     '''
     Plots the dc-dist tree, optionally highligthing nodes chosen as centers with a red outline. Shows the node indexes on the leaves and dc-distances in the non-leaf nodes. The leaves are color-coded by the provided labels.
     A yellow outline means that a node was labelled noise. 
@@ -451,7 +455,6 @@ def plot_tree(root, labels=None, centers=None, save=False, save_name=None, is_bi
     '''
     if labels is None:
        labels = np.arange(root.size)
-
     dist_dict = {}
 
     edge_list = []
@@ -472,11 +475,22 @@ def plot_tree(root, labels=None, centers=None, save=False, save_name=None, is_bi
     G = nx.Graph()
     G.add_edges_from(edge_list)
 
+    extra_dict = {}
     pos_dict = {}
     for i, node in enumerate(G.nodes):
         pos_dict[node] = pos_list[i]
         #+1 for {:.0f} as these are the node numbers which are 0 indexed from the point_ids in the tree, but are 1-indexed in the other visualizations.
         dist_dict[node] = '{:.2f}'.format(dist_list[i]) if dist_list[i] % 1 != 0 else '{:.0f}'.format(dist_list[i])
+
+        if extra_annotations is not None: #Also for extra here
+          extra_dict[node] = np.round(extra_annotations[i],2) 
+
+    if extra_annotations is not None:
+      #New modification for optional annotations on the tree here.
+      for node, (x, y) in pos_dict.items():
+          #print("Node:", node)
+          #First two are the positions of the extra text, the third is the actual text to add.
+          plt.text(x, y + 0.05, extra_dict[node], horizontalalignment='center', fontsize=8)
 
     if is_binary:  
       plt.title("binary dc-distance tree with " + str(len(labels)) + " points")

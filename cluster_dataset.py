@@ -131,7 +131,7 @@ if __name__ == '__main__':
                        )
     labels = np.array([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16])
     
-    #points, labels = create_dataset(num_points=num_points, type=dataset_type, save=save_dataset, load=load_dataset, save_name=save_name, load_name=load_name)
+    points, labels = create_dataset(num_points=num_points, type=dataset_type, save=save_dataset, load=load_dataset, save_name=save_name, load_name=load_name)
 
 
     t1 = time.time()
@@ -158,7 +158,7 @@ if __name__ == '__main__':
     
 
     #K-median clustering
-    kmedian = DCKCentroids(k=k, min_pts=min_pts, loss="kmedian", noise_mode="none")
+    kmedian = DCKCentroids(k=k, min_pts=min_pts, loss="kmedian", noise_mode="full")
     kmedian.fit(points)
 
     kmedian_labels = kmedian.labels_
@@ -169,14 +169,13 @@ if __name__ == '__main__':
     dbscan.fit(points)
     dbscan_labels = dbscan.labels_
 
-
-    hdbscan_new = newScan(min_pts=min_pts, min_cluster_size=mcs, allow_single_cluster=True)
+    #THIS CREATES ITS OWN TREE WITH ANOTHER STRUCTURE!!!
+    hdbscan_new = newScan(min_pts=min_pts, min_cluster_size=mcs, allow_single_cluster=True, tree=root)
     hdbscan_new.fit(points)
     hdb_new_labels = hdbscan_new.labels_
     num_clusters_new = len(np.unique(hdb_new_labels))
     if np.isin(-1, hdb_new_labels) and num_clusters_new != 1: #Should not count noise labels as a set of labels
                 num_clusters_new -= 1
-
 
 
     hdbscan = HDBSCAN(min_cluster_size=mcs, min_samples=min_pts)
@@ -190,7 +189,7 @@ if __name__ == '__main__':
     
     #Kmeans using same number of clusters as hdbscan finds
     kmeans_hk = DCKCentroids(k=k, min_pts=min_pts, loss="kmeans", noise_mode="none")
-    kmeans_hk.plusplus_dc_kmeans(points=points, minPts=min_pts, max_iters=100)
+    kmeans_hk.fit(points=points)
     kmeans_labels_hk = kmeans_hk.labels_
 
     k = str(k)
@@ -201,9 +200,7 @@ if __name__ == '__main__':
     # print("New:", normalize_cluster_ordering(hdb_new_labels))
     # print("Old:", normalize_cluster_ordering(hdb_labels))
 
-    #Pruning the tree here:
-    #new_root = prune_tree(root, 3)
-    #plot_tree(new_root, labels)
+
 
 
 
@@ -211,18 +208,13 @@ if __name__ == '__main__':
     #Plot the complete graph from the dataset with the specified distance measure on all of the edges. Optionally show the distances in embedded space with MDS.
     if points.shape[0] < 100:
         #visualize(points=points, cluster_labels=hdb_labels, minPts=min_pts, distance="dc_dist", centers=centers, save=save_visualization, save_name=image_save_name)
-        #HDBSCAN dc-tree labellings:
-        # plot_tree(root, hdb_new_labels, None, save=save_visualization, save_name=image_save_name)
-        # plot_tree(root, hdb_labels, None, save=save_visualization, save_name=image_save_name)
 
-        #K-median dc-tree labellings:
-        #root.dist = 500
-        kmedian_labels = None
-        plot_tree(root, kmedian_labels, kmedian_centers, save=save_visualization, save_name=image_save_name, is_binary=True)
+        print("kmedian labels:", labels)
+        extra_stabilities = hdbscan_new.extra_annotations
+
+        plot_tree(root, kmedian_labels, kmedian_centers, save=save_visualization, save_name=image_save_name, is_binary=True, extra_annotations=extra_stabilities)
         plot_tree(n_root, kmedian_labels, kmedian_centers, save=save_visualization, save_name=image_save_name, is_binary=False)
-        #Plot the dc-tree, optionally with the centers from the final kmeans clusters marked in red
-        #plot_tree(root, kmeans_labels, kmeans.center_indexes, save=save_visualization, save_name=image_save_name)
-        #plot_tree(root, hdb_labels, None, save=save_visualization, save_name=image_save_name)
+
 
     #Plot the final clustering of the datapoints in 2D euclidean space.
     plot_points = points
