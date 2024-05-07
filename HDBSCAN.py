@@ -230,16 +230,21 @@ class HDBSCAN(object):
 
         stability1 = cluster_sum_inv/(var + mu_offset)
 
-        stability2 = cluster_sum / (var**2 + mu_offset)
+        stability2 = cluster_sum_inv / (var**2 + mu_offset)
 
+        stability3 = cluster_sum_inv / var if var > 0 else stability1
+
+        stability4 = cluster_sum_inv / (var/bar) if var > 0 and bar > 0 else stability3
         #stability3 = len(nodes)/(var/bar)        
         print("")
+        show_nodes = min(5, len(nodes))
+        print("nodes:", np.array(nodes)[:show_nodes])
         print("Stability 1:", stability1)
         print("Stability 2:", stability2)
         #print("Stability 3:", stability3)
         print("")
 
-        return stability1
+        return stability4
 
 
     def cluster_statistics(self, dc_tree):

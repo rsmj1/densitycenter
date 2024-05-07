@@ -217,16 +217,7 @@ class DCKCentroids(object):
 
      list_builder(dc_tree, output)
      print("output:", output)
-     n = points.shape[0]
-
-     labels = np.zeros(n)
-     for tup in output:
-      i = tup[0]
-      label = tup[1]
-      labels[i] = label
-     labels = self.normalize_cluster_ordering(labels) #THIS STEP IS NOT O(n) DUE TO USING SET IN 
-     print("labels:", labels)
-     return labels
+     return self.tuple_labels_to_labels(output)
         
 
   def assign_points_prune_full(self, points, dc_tree):
@@ -249,7 +240,6 @@ class DCKCentroids(object):
         else:
             left_path= list_builder(dc_tree.left_tree, list)
             right_path = list_builder(dc_tree.right_tree, list)
-
             if dc_tree.center_path: #On center path they should be assigned
 
                if dc_tree.num_centers == 1:
@@ -258,52 +248,126 @@ class DCKCentroids(object):
                   #Now, those points that come from a single-center path should now be pruned together via external method.
                   #Those that don't should be assigned to noise
                   points, noise = [],[]
-                  if left_path == 0:
-                     # print("This set of points should be assigned:", self.get_leaves(dc_tree.left_tree))
-                     # print("To this center:", dc_tree.left_tree.unique_center)
+                  if left_path == 0: #Assign via pruned tree
                      points, noise = self.prune_cluster_subtree(dc_tree.left_tree, self.min_pts)
                      center = dc_tree.left_tree.unique_center
                      for point in points:
                         list.append((point, center))  
                      for point in noise:
                         list.append((point, -1))
-                  elif left_path == 1:
-
+                  elif left_path == 1: #Assign to noise
                      noise = self.get_leaves(dc_tree.left_tree)
-                     for point in noise:
+                     for point in noise: 
                         list.append((point, -1))
-                     #Assign to noise
 
-                  if right_path == 0:
-                     # print("This set of points should be assigned:", self.get_leaves(dc_tree.left_tree))
-                     # print("To this center:", dc_tree.left_tree.unique_center)
+                  if right_path == 0: #Assign via pruned tree
                      points, noise = self.prune_cluster_subtree(dc_tree.right_tree, self.min_pts)
                      center = dc_tree.right_tree.unique_center
                      for point in points:
                         list.append((point, center)) 
                      for point in noise:
                         list.append((point, -1))
-                  elif right_path == 1:
+                  elif right_path == 1: #Assign to noise
                      noise = self.get_leaves(dc_tree.right_tree)
                      for point in noise:
                         list.append((point, -1))    
                   
-                  return 2 #Return false here - 
+                  return 2 #Points from here are already assigned, so return 2 
             
             else: #Not on center path - cannnot be assigned yet
                return 1
 
      list_builder(dc_tree, output)
-     n = points.shape[0]
+     print("output:", output)
+     return self.tuple_labels_to_labels(output)
 
+  def assign_points_prune_stability(self, dc_tree, stability):
+     '''
+     Assigns points to the centers based on stability computation. 
+     '''
+     output = []
+
+     def list_builder(dc_tree, list, stability):
+        '''
+        Inefficient implementation for now - proof of concept.
+        Helper method that does the recursive list building.
+        Returns 0 from a single-center path and 1 from an "unknown" path, and 2 from a multi-center path.
+        '''
+        if dc_tree.is_leaf:
+            if dc_tree.center_path:
+              return 0, stability(dc_tree), dc_tree
+            else:
+              return 1, 0, None #Not a center path - so no need to compute a stability and return any pointer to a tree.
+        else:
+            left_path, left_best_stability, left_best_cluster = list_builder(dc_tree.left_tree, list)
+            right_path, right_best_stability, right_best_cluster = list_builder(dc_tree.right_tree, list)
+            if dc_tree.center_path: #On center path they should be assigned
+
+               if dc_tree.num_centers == 1: #Compute new stability since we are on a center path and return the best of the stabilities.
+                  new_stability = stability(dc_tree)
+                  if left_path == 0:
+                     if new_stability >= left_best_stability:
+                        return 0, new_stability, dc_tree
+                     else:
+                        return 0, left_best_stability, left_best_cluster
+                  else:
+                     if new_stability >= right_best_stability:
+                        return 0, new_stability, dc_tree
+                     else:
+                        return 0, right_best_stability, right_best_cluster
+               else: #Not uniquely close to one center (potentially anymore, we might be coming from a single center path)
+                  points, noise = [],[]
+                  if left_path == 0: #Assign via pruned tree
+                     points = self.get_leaves(left_best_cluster)
+                     center = dc_tree.left_tree.unique_center
+                     noise = [p for p in self.get_leaves(dc_tree) if p not in points]
+                     for point in points:
+                        list.append((point, center))  
+                     for point in noise:
+                        list.append((point, -1))
+                  elif left_path == 1: #Assign to noise
+                     noise = self.get_leaves(dc_tree.left_tree)
+                     for point in noise: 
+                        list.append((point, -1))
+
+                  if right_path == 0: #Assign via pruned tree
+                     points = self.get_leaves(right_best_cluster)
+                     center = dc_tree.right_tree.unique_center
+                     noise = [p for p in self.get_leaves(dc_tree) if p not in points]
+                     for point in points:
+                        list.append((point, center)) 
+                     for point in noise:
+                        list.append((point, -1))
+                  elif right_path == 1: #Assign to noise
+                     noise = self.get_leaves(dc_tree.right_tree)
+                     for point in noise:
+                        list.append((point, -1))    
+                  
+                  return 2 #Points from here are already assigned, so return 2 
+            
+            else: #Not on center path - cannnot be assigned yet
+               return 1
+
+     list_builder(dc_tree, output)
+     print("output:", output)
+     return self.tuple_labels_to_labels(output)
+
+
+
+  def tuple_labels_to_labels(self, tuples):
+     '''
+     Takes a list of tuples [(point, label),...,] and makes it into a standard cluster labelling. 
+     '''
+     
+     n = len(tuples)
      labels = np.zeros(n)
-     for tup in output:
+     for tup in tuples:
       i = tup[0]
       label = tup[1]
       labels[i] = label
      labels = self.normalize_cluster_ordering(labels) #THIS STEP IS NOT O(n) DUE TO USING SET IN 
      return labels
-
+     
 
   def prune_cluster_subtree(self, dc_tree, min_pts):
    '''
