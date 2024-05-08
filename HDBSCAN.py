@@ -136,8 +136,7 @@ class HDBSCAN(object):
         '''
         if dc_tree.is_leaf:
             #Temporary extra code
-            var,bar,dsize = self.cluster_statistics(dc_tree)
-            new_stability = self.cluster_stability_experimental(dc_tree, var, bar, dsize, cdists)
+            new_stability = self.cluster_stability_experimental(dc_tree, cdists)
             self.extra_annotations.append(new_stability)
 
             if self.min_cluster_size > 1:
@@ -154,8 +153,7 @@ class HDBSCAN(object):
         else:
             tree_size = self.get_tree_size(dc_tree)
             if self.min_cluster_size > tree_size:
-                var,bar,dsize = self.cluster_statistics(dc_tree)
-                new_stability = self.cluster_stability_experimental(dc_tree, var, bar, dsize, cdists)
+                new_stability = self.cluster_stability_experimental(dc_tree, cdists)
                 self.extra_annotations.append(new_stability)
 
                 return [], 0, [] #Noise
@@ -166,17 +164,14 @@ class HDBSCAN(object):
                 #We do not explicitly need propagation information as the value inevitably is the same or higher at the top of the split anyways, so we cannot get the below clusters as real clusters anyways.
 
                 #Experimental stability computations:
-                var,bar,dsize = self.cluster_statistics(dc_tree)
-                new_stability = self.cluster_stability_experimental(dc_tree, var, bar, dsize, cdists)
+                new_stability = self.cluster_stability_experimental(dc_tree, cdists)
                 self.extra_annotations.append(new_stability)
                 #End of experimental stability computations.
-
 
 
                 left_clusters, left_stability, left_last_clustering = self.compute_clustering(dc_tree.left_tree, cdists, dc_tree.dist)
                 right_clusters, right_stability, right_last_clustering = self.compute_clustering(dc_tree.right_tree, cdists, dc_tree.dist)
                     
-                
                 
                 if parent_dist is None: #Root call has no parent_dist.
                     if not self.allow_single_cluster:
@@ -219,7 +214,8 @@ class HDBSCAN(object):
                                 return all_clusters, total_stability, all_clusters 
 
 
-    def cluster_stability_experimental(self, tree, var, bar, dist_matrix_size, cdists):
+    def cluster_stability_experimental(self, tree, cdists):
+        var,bar,dsize = self.cluster_statistics(tree)
         nodes = self.get_leaves(tree)                 
         cluster_sum_inv = np.sum(1/cdists[nodes])  
         cluster_sum = np.sum(cdists[nodes])
@@ -228,23 +224,31 @@ class HDBSCAN(object):
 
         mu_offset = np.mean(cdists) #Use the mean of the core-dists as an offset to fix the 0 issues. 
 
-        stability1 = cluster_sum_inv/(var + mu_offset)
+        stability1 = cluster_sum_inv/(var + bar)
 
         stability2 = cluster_sum_inv / (var**2 + mu_offset)
 
-        stability3 = cluster_sum_inv / var if var > 0 else stability1
+        stability3 = cluster_sum_inv / var if var > 1e-10 else stability1
 
-        stability4 = cluster_sum_inv / (var/bar) if var > 0 and bar > 0 else stability3
+        stability4 = cluster_sum_inv / (var/bar) if var > 1e-10 and bar > 0 else stability3
+        pdist = tree.parent.dist if tree.parent is not None else np.inf
+        dist = tree.dist if not tree.is_leaf else cdists[tree.point_id]
+        stability5 = (cluster_sum_inv * (1/dist - 1/pdist)) /  (var/bar) if var > 1e-10 else stability1
         #stability3 = len(nodes)/(var/bar)        
         print("")
         show_nodes = min(5, len(nodes))
-        print("nodes:", np.array(nodes)[:show_nodes])
-        print("Stability 1:", stability1)
-        print("Stability 2:", stability2)
+        print("nodes:", np.array(nodes)[:show_nodes]+1)
+        #print("Stability 1:", stability1)
+        #print("Stability 2:", stability2)
         #print("Stability 3:", stability3)
+        print("offset:", mu_offset)
+        print("var:", var)
+        print("(1/dist - 1/pdist)", (1/dist - 1/pdist))
+        #print("stability 4:", stability4)
+        print("stability 5:", stability5)
         print("")
 
-        return stability4
+        return stability5
 
 
     def cluster_statistics(self, dc_tree):

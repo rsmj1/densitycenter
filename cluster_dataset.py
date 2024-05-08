@@ -40,7 +40,7 @@ if __name__ == '__main__':
     #################### RUN PARAMETERS HERE #######################
 
     num_points = 50
-    k = 5
+    k = 2
     min_pts = 3
     mcs = 2
 
@@ -49,7 +49,7 @@ if __name__ == '__main__':
     eps = 2
     dataset_type = "moon" 
     save_dataset = False
-    load_dataset = True #If true will override the other params and just load from the filename.
+    load_dataset = False #If true will override the other params and just load from the filename.
     save_name = "debugstability" #Shared for name of images, filename to save the dataset into
     load_name = "debugstability"
 

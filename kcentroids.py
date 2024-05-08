@@ -1,6 +1,7 @@
 import efficientdcdist.dctree as dcdist
 import numpy as np
 import heapq
+import numba
 from density_tree import make_tree
 from cluster_tree import prune_tree, copy_tree
 class DCKCentroids(object):
@@ -29,11 +30,15 @@ class DCKCentroids(object):
         self.center_indexes = None #The point indexes in the point list of the centers
         self.noise_mode = noise_mode #The execution mode - either no noise detection, "medium" noise detection or full noise detection
 
+        self.cdists = None
+
+
   def fit(self, points):
     '''
     Solves the K-median / K-means problem optimally over the dc-distance and (binary) dc-tree. 
     '''
     print("Running " + self.loss + " with noise detection: " + self.noise_mode)
+    self.cdists = self.get_cdists(points, self.min_pts)
     self.efficient_greedy(points)
     #self.simple_greedy(points)
 
@@ -55,7 +60,7 @@ class DCKCentroids(object):
 
       if self.noise_mode == "medium" or self.noise_mode == "full":
             #This is to avoid picking noise points as centers
-            annotations1 = self.prune_annotations_other(dc_tree, annotations) #This prunes based on the pruned tree. This is always slightly less aggressive than the one below. 
+            #annotations1 = self.prune_annotations_other(dc_tree, annotations) #This prunes based on the pruned tree. This is always slightly less aggressive than the one below. 
             annotations = self.prune_annotations(annotations) #This prunes based on occurences in the annotation list.
 
       annotations.sort(reverse=True, key=lambda x : x[0]) #Sort by the first value of the tuples - the potential cost-decrease. Reverse=True to get descending order.
@@ -80,7 +85,8 @@ class DCKCentroids(object):
          self.labels_ = self.assign_points_prune(points, dc_tree)
       elif self.noise_mode == "full":
          self.mark_center_paths(dc_tree, centers)
-         self.labels_ = self.assign_points_prune_full(points, dc_tree)        
+         #self.labels_ = self.assign_points_prune_full(points, dc_tree) 
+         self.labels_ = self.assign_points_prune_stability(dc_tree, self.cluster_stability_experimental)      
          
       else: 
          raise AssertionError("The noise detection mode is not recognized. Choose between none, medium or full.")
@@ -281,7 +287,7 @@ class DCKCentroids(object):
      print("output:", output)
      return self.tuple_labels_to_labels(output)
 
-  def assign_points_prune_stability(self, dc_tree, stability):
+  def assign_points_prune_stability(self, dc_tree, stability_function):
      '''
      Assigns points to the centers based on stability computation. 
      '''
@@ -295,17 +301,24 @@ class DCKCentroids(object):
         '''
         if dc_tree.is_leaf:
             if dc_tree.center_path:
-              return 0, stability(dc_tree), dc_tree
+              sta = stability(dc_tree, self.cdists)
+              print("nodes:", np.array(self.get_leaves(dc_tree))+1)
+              print("stability:", sta)
+              return 0, stability(dc_tree, self.cdists), dc_tree
             else:
               return 1, 0, None #Not a center path - so no need to compute a stability and return any pointer to a tree.
         else:
-            left_path, left_best_stability, left_best_cluster = list_builder(dc_tree.left_tree, list)
-            right_path, right_best_stability, right_best_cluster = list_builder(dc_tree.right_tree, list)
+            left_path, left_best_stability, left_best_cluster = list_builder(dc_tree.left_tree, list, stability)
+            right_path, right_best_stability, right_best_cluster = list_builder(dc_tree.right_tree, list, stability)
             if dc_tree.center_path: #On center path they should be assigned
 
                if dc_tree.num_centers == 1: #Compute new stability since we are on a center path and return the best of the stabilities.
-                  new_stability = stability(dc_tree)
-                  if left_path == 0:
+                  new_stability = stability(dc_tree, self.cdists)
+                  sta = stability(dc_tree, self.cdists)
+                  print("nodes:", np.array(self.get_leaves(dc_tree))+1)
+                  print("stability:", sta)
+                  
+                  if left_path == 0: #Check if the center path comes from left or right and compare stabilities, choose the best one.
                      if new_stability >= left_best_stability:
                         return 0, new_stability, dc_tree
                      else:
@@ -319,8 +332,10 @@ class DCKCentroids(object):
                   points, noise = [],[]
                   if left_path == 0: #Assign via pruned tree
                      points = self.get_leaves(left_best_cluster)
+                     print("points to assign l:", points)
                      center = dc_tree.left_tree.unique_center
-                     noise = [p for p in self.get_leaves(dc_tree) if p not in points]
+                     noise = [p for p in self.get_leaves(dc_tree.left_tree) if p not in points]
+                     print("points for noise l:", noise)
                      for point in points:
                         list.append((point, center))  
                      for point in noise:
@@ -332,8 +347,10 @@ class DCKCentroids(object):
 
                   if right_path == 0: #Assign via pruned tree
                      points = self.get_leaves(right_best_cluster)
+                     print("points to assign r:", points)
                      center = dc_tree.right_tree.unique_center
-                     noise = [p for p in self.get_leaves(dc_tree) if p not in points]
+                     noise = [p for p in self.get_leaves(dc_tree.right_tree) if p not in points]
+                     print("points for noise r:", noise)                     
                      for point in points:
                         list.append((point, center)) 
                      for point in noise:
@@ -343,12 +360,12 @@ class DCKCentroids(object):
                      for point in noise:
                         list.append((point, -1))    
                   
-                  return 2 #Points from here are already assigned, so return 2 
+                  return 2, 0, None #Points from here are already assigned, so return 2 
             
             else: #Not on center path - cannnot be assigned yet
-               return 1
+               return 1, 0, None
 
-     list_builder(dc_tree, output)
+     list_builder(dc_tree, output, stability_function)
      print("output:", output)
      return self.tuple_labels_to_labels(output)
 
@@ -635,3 +652,98 @@ class DCKCentroids(object):
 
       #print("cluster_labels after:", norm_cluster_labels)
       return norm_cluster_labels
+  
+
+  
+  def cluster_stability_experimental(self, tree, cdists):
+     var,bar,dsize = self.cluster_statistics(tree)
+     nodes = self.get_leaves(tree)                 
+     cluster_sum_inv = np.sum(1/cdists[nodes])  
+     cluster_sum = np.sum(cdists[nodes])
+     max_cdist = np.max(cdists)
+     other_sum = np.sum(max_cdist - cdists[nodes])  
+     mu_offset = np.mean(cdists) #Use the mean of the core-dists as an offset to fix the 0 issues.   
+     stability1 = cluster_sum_inv/(var + bar)  
+     stability2 = cluster_sum_inv / (var**2 + mu_offset)  
+     stability3 = cluster_sum_inv / var if var > 1e-10 else stability1  
+     stability4 = cluster_sum_inv / (var/bar) if var > 1e-10 and bar > 0 else stability3
+     pdist = tree.parent.dist if tree.parent is not None else np.inf
+     dist = tree.dist if not tree.is_leaf else cdists[tree.point_id]
+     stability5 = (cluster_sum_inv * (1/dist - 1/pdist)) /  (var/bar) if var > 1e-10 else stability1
+
+     show_nodes = min(5, len(nodes))
+     if stability5 == np.inf:
+        return 0
+     return stability5  
+  def cluster_statistics(self, dc_tree):
+     '''
+     Computes the variance of the dc-distance matrix of the set of nodes and all subsets of it bottom up.
+     Returns the variance, mean and size of the distance matrix (lower triangular).
+     '''
+     if dc_tree.is_leaf:
+        return 0,0,0 #return var, bar, num_pairwise_dists
+     else:
+        lvar, lbar, l_dists_size = self.cluster_statistics(dc_tree.left_tree)
+        rvar, rbar, r_dists_size = self.cluster_statistics(dc_tree.right_tree)
+        
+        new_var, new_bar, new_dists_size = self.merge_subtree_variance(dc_tree.dist, l_dists_size, r_dists_size, lvar, rvar, lbar, rbar, dc_tree.left_tree.size, dc_tree.right_tree.size)
+        return new_var, new_bar, new_dists_size
+       
+  def combined_variance(self, n,m,xvar,yvar,xbar,ybar):
+     '''
+     https://stats.stackexchange.com/questions/557469/difference-between-pooled-variance-and-combined-variance  
+     Returns the combined size, combined mean and combined variance
+     '''
+     nc = n+m
+     xc = self.combined_mean(n,m,xbar,ybar)
+     vc = (n*(xvar+(xbar-xc)**2)+m*(yvar+(ybar-xc)**2))/(nc)
+     return vc, xc, nc  
+  def combined_mean(self, n,m,xbar,ybar):
+     return (xbar*n+ybar*m)/(n+m)
+  
+  def merge_subtree_variance(self, dist,  l_dists_size, r_dists_size, lvar, rvar, lbar, rbar, lsetsize, rsetsize):
+     if l_dists_size + r_dists_size != 0: 
+        sub_var, sub_bar, sub_size = self.combined_variance(l_dists_size, r_dists_size, lvar, rvar, lbar, rbar)
+        
+        new_dists_size = lsetsize*rsetsize
+        merge_var, merge_bar, merge_dists_size = self.combined_variance(sub_size, new_dists_size, sub_var, 0, sub_bar, dist)
+     else: #If no dists in either distribution so far (coming from leaves)
+        merge_var, merge_bar, merge_dists_size = 0, dist, 1  
+     return merge_var, merge_bar, merge_dists_size
+  
+  def get_cdists(self, points, min_pts):
+       '''
+       Computes the core distances of a set of points, given a min_pts.
+       '''
+       num_points = points.shape[0]
+       dim = int(points.shape[1])  
+       D = np.zeros([num_points, num_points])
+       D = self.get_dist_matrix(points, D, dim, num_points)  
+       cdists = np.sort(D, axis=1)
+       cdists = cdists[:, min_pts - 1] #These are the core-distances for each point.
+       #print("cdists:", cdists)
+       return cdists
+
+  @staticmethod
+  @numba.njit(fastmath=True, parallel=True)
+  def get_dist_matrix(points, D, dim, num_points):
+      '''
+      Returns the Euclidean distance matrix of a 2D set of points.  
+      Parameters
+      ---------  
+      points : n x m 2D numpy array
+      D : empty n x n numpy array
+      dim : m
+      num_points : n
+      '''
+      for i in numba.prange(num_points):
+          x = points[i]
+          for j in range(i+1, num_points):
+              y = points[j]
+              dist = 0
+              for d in range(dim):
+                  dist += (x[d] - y[d]) ** 2
+              dist = np.sqrt(dist)
+              D[i, j] = dist
+              D[j, i] = dist
+      return D
