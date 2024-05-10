@@ -452,6 +452,8 @@ def plot_tree(root, labels=None, centers=None, save=False, save_name=None, is_bi
     centers : Numpy.Array, default=None
     save : Boolean, default=False
     save_name : String, default=None
+    extra_annotations, Numpy.Array, default=None
+      The annotations should be provided in preorder traversal order over the binary tree.
     '''
     if labels is None:
        labels = np.arange(root.size)
@@ -486,6 +488,7 @@ def plot_tree(root, labels=None, centers=None, save=False, save_name=None, is_bi
           extra_dict[node] = np.round(extra_annotations[i],2) 
 
     if extra_annotations is not None:
+      #assert isinstance(is_binary, True), "Can only add extra annotations currently to the binary version of the dc-tree."
       #New modification for optional annotations on the tree here.
       for node, (x, y) in pos_dict.items():
           #print("Node:", node)
