@@ -54,7 +54,7 @@ class NaryDensityTree:
         self.children.append(subtree)
 
 
-def tree_builder(dists, labels, point_ids):
+def tree_builder(dists, labels, point_ids, parent=None):
     '''
     Main method for building the n-ary dc-tree. Recursively finds the next splits at each level, building the tree in recursive manner.
     It gets the next split-values. If the group is a leaf group it makes a "leaf tree" for each, otherwise it recurses on the group.
@@ -71,7 +71,7 @@ def tree_builder(dists, labels, point_ids):
         The ids of the points. 
     '''
     largest_dist = np.max(dists[0]) #You can always find the largest distance in every row.
-    root = NaryDensityTree(largest_dist, size=dists.shape[0])
+    root = NaryDensityTree(largest_dist, size=dists.shape[0], parent=parent)
     
     split_groups = get_next_split(dists, largest_dist) #Get the split structure for this level of the tree
 
@@ -89,7 +89,7 @@ def tree_builder(dists, labels, point_ids):
             recurse_dists = dists[inds][:, inds]
             recurse_labels = labels[inds] if labels is not None else None
             recurse_point_ids =  point_ids[inds]
-            root.add_child(tree_builder(recurse_dists, recurse_labels, recurse_point_ids))
+            root.add_child(tree_builder(recurse_dists, recurse_labels, recurse_point_ids, parent=root))
 
     return root
     
@@ -168,5 +168,5 @@ def make_n_tree(points, labels=None, min_points=1, point_ids=None):
     if point_ids is None:
         point_ids = np.arange(int(dc_dists.shape[0]))
 
-    root = tree_builder(dc_dists, labels, point_ids)
+    root = tree_builder(dc_dists, labels, point_ids, parent=None)
     return root, dc_dists

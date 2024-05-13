@@ -302,8 +302,8 @@ class DCKCentroids(object):
         if dc_tree.is_leaf:
             if dc_tree.center_path:
               sta = stability(dc_tree, self.cdists)
-              print("nodes:", np.array(self.get_leaves(dc_tree))+1)
-              print("stability:", sta)
+              #print("nodes:", np.array(self.get_leaves(dc_tree))+1)
+              #print("stability:", sta)
               return 0, stability(dc_tree, self.cdists), dc_tree
             else:
               return 1, 0, None #Not a center path - so no need to compute a stability and return any pointer to a tree.

@@ -67,7 +67,6 @@ class HDBSCAN(object):
 
         cdists = np.sort(D, axis=1)
         cdists = cdists[:, min_pts - 1] #These are the core-distances for each point.
-        #print("cdists:", cdists)
         return cdists
 
     @staticmethod
@@ -135,6 +134,7 @@ class HDBSCAN(object):
         Parent_dist is the maximal point at which the cluster exists.
         '''
         if self.min_cluster_size > dc_tree.size:
+            #print("leaf, returning noise", self.get_leaves(dc_tree)+1)
             return [], 0 #Noise
         else:
             total_stability = 0
@@ -144,8 +144,11 @@ class HDBSCAN(object):
 
             for child in dc_tree.children:
                 if child.size >= self.min_cluster_size and split_size >= 2: #Currently we do not allow multiple points at the same height (as leaves) to constitute a split.
+                    #print("rec call True", self.get_leaves(dc_tree)+1)
                     clusters, stability = self.compute_clustering(child, cdists, True)
                 else:
+                    #print("rec call False", self.get_leaves(dc_tree)+1)
+
                     clusters, stability = self.compute_clustering(child, cdists, False)
 
                 total_stability += stability
@@ -155,6 +158,7 @@ class HDBSCAN(object):
 
             if merge_above: #When we have a merge above, we know that this current subtree in its entirety might constitute a cluster depending on stability computations within it.                
                 if dc_tree.parent is None: #Root call
+                    print("Root call check!")
                     if len(below_clusters) <= 1:
                         if self.allow_single_cluster:
                             return [dc_tree]
@@ -162,8 +166,12 @@ class HDBSCAN(object):
                             return []
                     else:
                         return below_clusters
+                    
                 else: #We compute the stability only here - all our stability measurements work bottom up - so even for the "new" stability measurement, we can just continue working up from the previous "checkpoint".
                     new_stability = self.cluster_stability(dc_tree, dc_tree.parent.dist, dc_tree.size, cdists)
+                    print("nodes", dc_tree.dist, self.get_leaves(dc_tree)+1)
+                    print("new stability:", new_stability)
+                    print("total stability:", total_stability)
                     if new_stability >= total_stability:
                         return [dc_tree], new_stability
                     else:
@@ -171,7 +179,6 @@ class HDBSCAN(object):
             else:
                 return below_clusters, total_stability
                 
-
 
 
 
@@ -243,12 +250,16 @@ class HDBSCAN(object):
         '''
         Returns the set of ids of the leaf nodes within the given cluster.
         '''
-        if dc_tree.is_leaf:
-            return [dc_tree.point_id]
-        else:
-            #print("left:", self.get_leaves(dc_tree.left_tree))
-            #print("right:", self.get_tree_size(dc_tree.right_tree))
-            return self.get_leaves(dc_tree.left_tree) + self.get_leaves(dc_tree.right_tree)
+        def leaf_helper(dc_tree):
+            if dc_tree.is_leaf:
+                return [dc_tree.point_id]
+            else:
+                leaves = []
+                for child in dc_tree.children:
+                    leaves += leaf_helper(child)
+                return leaves
+            
+        return np.array(leaf_helper(dc_tree))
 
     def label_clusters(self, clustering, n):
         '''

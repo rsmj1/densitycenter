@@ -189,10 +189,13 @@ class HDBSCAN(object):
                             return left_clusters + right_clusters
                                  
                 else:
+                    
                     total_stability = left_stability + right_stability 
                     all_clusters = left_clusters + right_clusters #append the clusters together, as there is no noise in either branch
                     new_stability = self.cluster_stability(dc_tree, parent_dist, tree_size, cdists) #This is the real stability.
-                    
+                    print("binary nodes", dc_tree.dist, np.array(self.get_leaves(dc_tree))+1)
+                    print("binary new stability:", new_stability)
+                    print("binary total stability:", total_stability)
                     
 
                     #TODO: I need to gather together all the noise at the same distance, as they might constitute a cluster.... 
@@ -235,18 +238,18 @@ class HDBSCAN(object):
         dist = tree.dist if not tree.is_leaf else cdists[tree.point_id]
         stability5 = (cluster_sum_inv * (1/dist - 1/pdist)) /  (var/bar) if var > 1e-10 else stability1
         #stability3 = len(nodes)/(var/bar)        
-        print("")
-        show_nodes = min(5, len(nodes))
-        print("nodes:", np.array(nodes)[:show_nodes]+1)
-        #print("Stability 1:", stability1)
-        #print("Stability 2:", stability2)
-        #print("Stability 3:", stability3)
-        print("offset:", mu_offset)
-        print("var:", var)
-        print("(1/dist - 1/pdist)", (1/dist - 1/pdist))
-        #print("stability 4:", stability4)
-        print("stability 5:", stability5)
-        print("")
+        # print("")
+        # show_nodes = min(5, len(nodes))
+        # print("nodes:", np.array(nodes)[:show_nodes]+1)
+        # #print("Stability 1:", stability1)
+        # #print("Stability 2:", stability2)
+        # #print("Stability 3:", stability3)
+        # print("offset:", mu_offset)
+        # print("var:", var)
+        # print("(1/dist - 1/pdist)", (1/dist - 1/pdist))
+        # #print("stability 4:", stability4)
+        # print("stability 5:", stability5)
+        # print("")
 
         return stability5
 
