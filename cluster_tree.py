@@ -1,5 +1,6 @@
 import numpy as np
 from density_tree import DensityTree
+from n_density_tree import NaryDensityTree
 
 class Cluster:
     def __init__(self, center, points, peak):
@@ -58,7 +59,7 @@ def copy_tree(root, min_points, pruned_parent=None):
 
 def prune_tree(dc_tree, min_pts, pruned_parent=None, curr_dist=None):
     '''
-    Version mainly used for visualization.
+    Version can be used for visualization.
 
     Returns a copy of the tree with only the non-pruned structure left. 
     Below a cut of noise will be a leaf with a -2 point_id label.
@@ -108,6 +109,33 @@ def prune_tree(dc_tree, min_pts, pruned_parent=None, curr_dist=None):
         return dc_tree
     
     return None  #Not a leaf - just a pruned part of the tree.
+
+
+def prune_n_tree(dc_tree, min_pts, pruned_parent=None):
+    '''
+    Version can be used for visualization.
+
+    Returns a copy of the tree with only the non-pruned structure left. 
+    Below a cut of noise will be a leaf with a -2 point_id label.
+    For something that becomes a leaf by pruning, the sub-structure under it will be reinstated. 
+    '''
+
+    #If len(dc_tree) is 1 - then it is to be pruned no matter what
+    #If curr_dist is same as dist in current node, then this node is not noise. That would have been detected higher up in the tree if it was.
+    if dc_tree.size >= min_pts:
+        pruned_root = NaryDensityTree(dc_tree.dist, orig_node=dc_tree, parent=pruned_parent)
+
+        for child in dc_tree.children:
+            pruned_root.add_child(prune_n_tree(child, min_pts, pruned_root))
+
+        if pruned_root.is_leaf: #If this node becomes a leaf in the pruned tree, we want its children back again.
+            return dc_tree
+        return pruned_root
+    else:
+        return None
+    
+
+
 
 def get_leaves(dc_tree):
     '''

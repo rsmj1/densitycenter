@@ -193,9 +193,9 @@ class HDBSCAN(object):
                     total_stability = left_stability + right_stability 
                     all_clusters = left_clusters + right_clusters #append the clusters together, as there is no noise in either branch
                     new_stability = self.cluster_stability(dc_tree, parent_dist, tree_size, cdists) #This is the real stability.
-                    print("binary nodes", dc_tree.dist, np.array(self.get_leaves(dc_tree))+1)
-                    print("binary new stability:", new_stability)
-                    print("binary total stability:", total_stability)
+                    # print("binary nodes", dc_tree.dist, np.array(self.get_leaves(dc_tree))+1)
+                    # print("binary new stability:", new_stability)
+                    # print("binary total stability:", total_stability)
                     
 
                     #TODO: I need to gather together all the noise at the same distance, as they might constitute a cluster.... 
@@ -219,6 +219,7 @@ class HDBSCAN(object):
 
     def cluster_stability_experimental(self, tree, cdists):
         var,bar,dsize = self.cluster_statistics(tree)
+
         nodes = self.get_leaves(tree)                 
         cluster_sum_inv = np.sum(1/cdists[nodes])  
         cluster_sum = np.sum(cdists[nodes])

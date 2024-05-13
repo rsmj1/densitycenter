@@ -21,7 +21,7 @@ from point_gen import create_hierarchical_clusters
 from visualization import visualize, plot_tree
 from benchmark import create_dataset
 from benchmark import normalize_cluster_ordering
-from cluster_tree import copy_tree, prune_tree
+from cluster_tree import copy_tree, prune_tree, prune_n_tree
 
 #Algorithms
 from sklearn.cluster import SpectralClustering
@@ -35,14 +35,16 @@ from DBSCAN import DBSCAN
 from HDBSCAN import HDBSCAN as newScan
 from kcentroids import DCKCentroids
 from HDBSCANnary import HDBSCAN as HDBSCANnary
+from kcentroids_nary import DCKCentroids as DCKCentroids_nary
+
 
 if __name__ == '__main__': 
     #################### RUN PARAMETERS HERE #######################
 
     num_points = 50
-    k = 2
+    k = 4
     min_pts = 3
-    mcs = 1
+    mcs = 3
 
     plot_tree_bool = False  
     n_neighbors = 15
@@ -110,26 +112,26 @@ if __name__ == '__main__':
     #                    )
     # labels = np.array([0,1,2,3,4,5,6,7,8,9,10,11])
 
-    points = np.array([[1,2],
-                       [1,4],
-                       [2,3],
-                       [1,1],
-                       [-5,15], #5
-                       [11,13],
-                       [13,11],
-                       [10,8],
-                       [14,13],
-                       [16,17], #10
-                       [18,19],
-                       [19,18],
-                       [21,24],
-                       [11,17],
-                       [28,21], #15
-                       [10,18],
-                       [7,7]
-                       ]
-                       )
-    labels = np.array([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16])
+    # points = np.array([[1,2],
+    #                    [1,4],
+    #                    [2,3],
+    #                    [1,1],
+    #                    [-5,15], #5
+    #                    [11,13],
+    #                    [13,11],
+    #                    [10,8],
+    #                    [14,13],
+    #                    [16,17], #10
+    #                    [18,19],
+    #                    [19,18],
+    #                    [21,24],
+    #                    [11,17],
+    #                    [28,21], #15
+    #                    [10,18],
+    #                    [7,7]
+    #                    ]
+    #                    )
+    # labels = np.array([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16])
     
     #points, labels = create_dataset(num_points=num_points, type=dataset_type, save=save_dataset, load=load_dataset, save_name=save_name, load_name=load_name)
 
@@ -147,7 +149,22 @@ if __name__ == '__main__':
     pred_labels, kcenter_centers, epsilons = dc_clustering(root, num_points=len(labels), k=k, min_points=min_pts,with_noise=True)
 
     #print("Pred labels:", pred_labels)
+    #K-median clustering
+    kmedian = DCKCentroids(k=k, min_pts=min_pts, loss="kmedian", noise_mode="medium")
+    kmedian.fit(points)
 
+    kmedian_labels = kmedian.labels_
+    kmedian_centers = kmedian.center_indexes
+    plot_tree(n_root, pred_labels, is_binary=False)
+
+    new_root = prune_n_tree(n_root, 4)
+    plot_tree(new_root, pred_labels, is_binary=False)
+
+    kmedian_nary = DCKCentroids_nary(k=k, min_pts=min_pts, loss="kmedian", noise_mode="medium")
+    kmedian_nary.fit(points)
+
+    kmedian_labels_nary = kmedian_nary.labels_
+    kmedian_centers_nary = kmedian_nary.center_indexes
 
 
     #K-means clustering
@@ -174,15 +191,15 @@ if __name__ == '__main__':
     hdbscan_new = newScan(min_pts=min_pts, min_cluster_size=mcs, allow_single_cluster=True, tree=root)
     hdbscan_new.fit(points)
     hdb_new_labels = hdbscan_new.labels_
-    num_clusters_new = len(np.unique(hdb_new_labels))
-    if np.isin(-1, hdb_new_labels) and num_clusters_new != 1: #Should not count noise labels as a set of labels
-                num_clusters_new -= 1
+    
 
     hdbscan_nary = HDBSCANnary(min_pts=min_pts, min_cluster_size=mcs, allow_single_cluster=False)
     hdbscan_nary.fit(points)
     hdbscan_nary_labels = hdbscan_nary.labels_
 
-
+    num_clusters_new = len(np.unique(hdbscan_nary_labels))
+    if np.isin(-1, hdbscan_nary_labels) and num_clusters_new != 1: #Should not count noise labels as a set of labels
+                num_clusters_new -= 1
 
     hdbscan = HDBSCAN(min_cluster_size=mcs, min_samples=min_pts)
     hdbscan.fit(points)
@@ -216,10 +233,10 @@ if __name__ == '__main__':
         #visualize(points=points, cluster_labels=hdb_labels, minPts=min_pts, distance="dc_dist", centers=centers, save=save_visualization, save_name=image_save_name)
 
         #print("kmedian labels:", labels)
-        extra_stabilities = hdbscan_new.extra_annotations
-        plot_tree(n_root, hdbscan_nary_labels, is_binary=False)
+        #extra_stabilities = hdbscan_new.extra_annotations
+        #plot_tree(n_root, hdbscan_nary_labels, is_binary=False)
         plot_tree(root, hdbscan_nary_labels)
-        plot_tree(root, hdb_labels)
+        plot_tree(n_root, hdb_labels, is_binary=False)
         plot_tree(root, kmedian_labels, kmedian_centers, save=save_visualization, save_name=image_save_name, is_binary=True, extra_annotations=extra_stabilities)
         plot_tree(n_root, kmedian_labels, kmedian_centers, save=save_visualization, save_name=image_save_name, is_binary=False)
 

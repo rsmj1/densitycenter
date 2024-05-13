@@ -323,7 +323,7 @@ def make_node_lists_nary(root, point_labels, parent_count, dist_list, edge_list,
         dist_list.append(root.dist)
     else: 
         dist_list.append(root.point_id+1)
-    if root.is_leaf:
+    if root.is_leaf and root.point_id is not None:
         if root.point_id == -2:
             color_list.append(0)
         else:

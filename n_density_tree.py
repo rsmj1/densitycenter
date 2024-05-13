@@ -51,6 +51,8 @@ class NaryDensityTree:
         return len(self.children)
     
     def add_child(self, subtree):
+        if subtree is None:
+            return
         self.children.append(subtree)
 
 

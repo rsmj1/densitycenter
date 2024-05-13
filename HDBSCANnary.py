@@ -51,6 +51,7 @@ class HDBSCAN(object):
         self.labels_ = None
         self.allow_single_cluster = allow_single_cluster
 
+        self.cdists = None
         #Temporary var for visualization
         self.extra_annotations = []
         self.tree = tree #Provided tree to ensure same order traversal as visualization
@@ -108,6 +109,7 @@ class HDBSCAN(object):
             raise AssertionError("n should be larger than both min_pts and min_cluster size...")
 
         cdists = self.get_cdists(points, self.min_pts)
+        self.cdists = cdists
         placeholder = np.zeros(n)
         if self.tree is None: #Important this assumes that the tree provided is for the correct points!!
             dc_tree,_ = make_n_tree(points, placeholder, self.min_pts, )
@@ -141,7 +143,7 @@ class HDBSCAN(object):
             below_clusters = []
             split_size = self.split_size(dc_tree, self.min_cluster_size)
             leaves = []
-
+            var, bar, dsize = self.cluster_statistics(dc_tree)
             for child in dc_tree.children:
                 if child.size >= self.min_cluster_size and split_size >= 2: #Currently we do not allow multiple points at the same height (as leaves) to constitute a split.
                     #print("rec call True", self.get_leaves(dc_tree)+1)
@@ -158,7 +160,7 @@ class HDBSCAN(object):
 
             if merge_above: #When we have a merge above, we know that this current subtree in its entirety might constitute a cluster depending on stability computations within it.                
                 if dc_tree.parent is None: #Root call
-                    print("Root call check!")
+                    #print("Root call check!")
                     if len(below_clusters) <= 1:
                         if self.allow_single_cluster:
                             return [dc_tree]
@@ -169,10 +171,11 @@ class HDBSCAN(object):
                     
                 else: #We compute the stability only here - all our stability measurements work bottom up - so even for the "new" stability measurement, we can just continue working up from the previous "checkpoint".
                     new_stability = self.cluster_stability(dc_tree, dc_tree.parent.dist, dc_tree.size, cdists)
-                    print("nodes", dc_tree.dist, self.get_leaves(dc_tree)+1)
-                    print("new stability:", new_stability)
-                    print("total stability:", total_stability)
+
                     if new_stability >= total_stability:
+                        if new_stability == 0:#This means that it is a leaf with same cdist as the distance above
+                            return [], 0
+                        
                         return [dc_tree], new_stability
                     else:
                         return below_clusters, total_stability
@@ -181,13 +184,19 @@ class HDBSCAN(object):
                 
 
 
-
     def split_size(self, dc_tree, min_cluster_size):
         split_size = 0
-        for child in dc_tree.children:
-            if child.size >= min_cluster_size: #Currently we do not allow multiple points at the same height (as leaves) to constitute a split.
-                    split_size += 1
-        return split_size
+        if min_cluster_size != 1:
+            for child in dc_tree.children:
+                if child.size >= min_cluster_size: #Currently we do not allow multiple points at the same height (as leaves) to constitute a split.
+                        split_size += 1
+            return split_size
+        else:
+            for child in dc_tree.children:
+                if child.is_leaf and self.cdists[child.point_id] == dc_tree.dist: #It is not a split if the point's self edge and adjacent edge are removed at the same time.
+                    continue
+                split_size += 1
+            return split_size
 
     def cluster_stability(self, dc_tree, parent_dist, tree_size, cdists):
         '''
@@ -207,7 +216,6 @@ class HDBSCAN(object):
         '''
         emax = tree_size/parent_dist
         eminsum = self.sub_contribution(dc_tree, cdists)
-
         return eminsum - emax
     
     def sub_contribution(self, dc_tree, cdists):
@@ -217,7 +225,7 @@ class HDBSCAN(object):
         '''
         if dc_tree.is_leaf:
             if self.min_cluster_size == 1:
-                stability = (1/cdists[dc_tree.point_id]) - (1/dc_tree.parent.dist)
+                stability = (1/cdists[dc_tree.point_id])
                 return stability
             else:
                 return 0
@@ -275,3 +283,55 @@ class HDBSCAN(object):
 
         return output_labels
 
+
+
+
+
+
+            ###############################################
+            ############ NEW STABILITY STUFF ##############
+
+    def cluster_statistics(self, dc_tree):
+        '''
+        Computes the variance of the dc-distance matrix of the set of nodes and all subsets of it bottom up.
+        Returns the variance, mean and size of the distance matrix (lower triangular).
+        '''
+        if dc_tree.is_leaf:
+            return 0,0,0 #return var, bar, num_pairwise_dists
+        else:
+            total_var, total_bar, total_dists_size = self.cluster_statistics(dc_tree.children[0])
+            total_tree_size = dc_tree.children[0].size
+            for child in dc_tree.children[1:]:
+                new_var, new_bar, new_dists_size = self.cluster_statistics(child)
+                total_var, total_bar, total_dists_size = self.merge_subtree_variance(dc_tree.dist, total_dists_size, new_dists_size, total_var, new_var, total_bar, new_bar, total_tree_size, child.size)
+                total_tree_size += child.size
+            
+            return total_var, total_bar, total_dists_size
+        
+ 
+    def merge_subtree_variance(self, dist,  l_dists_size, r_dists_size, lvar, rvar, lbar, rbar, lsetsize, rsetsize):
+        if l_dists_size + r_dists_size != 0: 
+            sub_var, sub_bar, sub_size = self.combined_variance(l_dists_size, r_dists_size, lvar, rvar, lbar, rbar)
+            
+            new_dists_size = lsetsize*rsetsize
+            merge_var, merge_bar, merge_dists_size = self.combined_variance(sub_size, new_dists_size, sub_var, 0, sub_bar, dist)
+        else: #If no dists in either distribution so far (coming from leaves)
+            merge_var, merge_bar, merge_dists_size = 0, dist, 1
+
+        return merge_var, merge_bar, merge_dists_size
+
+    def combined_variance(self, n,m,xvar,yvar,xbar,ybar):
+        '''
+        https://stats.stackexchange.com/questions/557469/difference-between-pooled-variance-and-combined-variance
+
+        Returns the combined size, combined mean and combined variance
+        '''
+        nc = n+m
+        xc = self.combined_mean(n,m,xbar,ybar)
+        vc = (n*(xvar+(xbar-xc)**2)+m*(yvar+(ybar-xc)**2))/(nc)
+        return vc, xc, nc
+
+    def combined_mean(self, n,m,xbar,ybar):
+        return (xbar*n+ybar*m)/(n+m)
+    
+    

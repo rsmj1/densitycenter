@@ -66,6 +66,10 @@ class DCKCentroids(object):
       annotations.sort(reverse=True, key=lambda x : x[0]) #Sort by the first value of the tuples - the potential cost-decrease. Reverse=True to get descending order.
       cluster_centers = set() #We should not use the "in" operation, as it is a worst-case O(n) operation. Just add again and again
 
+      # print("Annotations BINARY:")
+      # display_annos = [(x[0], x[1], self.get_leaves(x[2])) for x in annotations]
+      # print(display_annos)
+
       for annotation in annotations:
          curr_len = len(cluster_centers)
          if curr_len >= self.k:
@@ -91,7 +95,7 @@ class DCKCentroids(object):
       else: 
          raise AssertionError("The noise detection mode is not recognized. Choose between none, medium or full.")
       
-      print("labels:", self.labels_)
+      print("labels BINIARY:", self.labels_)
 
       self.center_indexes = centers
       self.centers = points[centers]
@@ -315,8 +319,8 @@ class DCKCentroids(object):
                if dc_tree.num_centers == 1: #Compute new stability since we are on a center path and return the best of the stabilities.
                   new_stability = stability(dc_tree, self.cdists)
                   sta = stability(dc_tree, self.cdists)
-                  print("nodes:", np.array(self.get_leaves(dc_tree))+1)
-                  print("stability:", sta)
+                  # print("nodes:", np.array(self.get_leaves(dc_tree))+1)
+                  # print("stability:", sta)
                   
                   if left_path == 0: #Check if the center path comes from left or right and compare stabilities, choose the best one.
                      if new_stability >= left_best_stability:
