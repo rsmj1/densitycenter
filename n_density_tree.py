@@ -172,3 +172,45 @@ def make_n_tree(points, labels=None, min_points=1, point_ids=None):
 
     root = tree_builder(dc_dists, labels, point_ids, parent=None)
     return root, dc_dists
+
+
+def prune_n_tree(dc_tree, min_pts, pruned_parent=None):
+    '''
+    Version can be used for visualization.
+
+    Returns a copy of the tree with only the non-pruned structure left. 
+    Below a cut of noise will be a leaf with a -2 point_id label.
+    For something that becomes a leaf by pruning, the sub-structure under it will be reinstated. 
+    '''
+
+    #If len(dc_tree) is 1 - then it is to be pruned no matter what
+    #If curr_dist is same as dist in current node, then this node is not noise. That would have been detected higher up in the tree if it was.
+    if dc_tree.size >= min_pts:
+        pruned_root = NaryDensityTree(dc_tree.dist, orig_node=dc_tree, parent=pruned_parent)
+
+        for child in dc_tree.children:
+            pruned_root.add_child(prune_n_tree(child, min_pts, pruned_root))
+
+        if pruned_root.is_leaf: #If this node becomes a leaf in the pruned tree, we want its children back again.
+            return dc_tree
+        size = len(get_leaves_nary(pruned_root))
+        pruned_root.size = size
+        return pruned_root
+    else:
+        return None
+    
+
+def get_leaves_nary(dc_tree):
+    '''
+    Returns the set of ids of the leaf nodes within the given cluster.
+    '''
+    def leaf_helper(dc_tree):
+        if dc_tree.is_leaf:
+            return [dc_tree.point_id]
+        else:
+            leaves = []
+            for child in dc_tree.children:
+                leaves += leaf_helper(child)
+            return leaves
+        
+    return np.array(leaf_helper(dc_tree))

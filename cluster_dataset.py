@@ -13,7 +13,7 @@ import time
 from experiment_utils.get_data import get_dataset, make_circles
 from distance_metric import get_dc_dist_matrix
 from density_tree import make_tree
-from n_density_tree import make_n_tree
+from n_density_tree import make_n_tree, prune_n_tree
 
 from tree_plotting import plot_embedding
 from cluster_tree import dc_clustering
@@ -21,7 +21,7 @@ from point_gen import create_hierarchical_clusters
 from visualization import visualize, plot_tree
 from benchmark import create_dataset
 from benchmark import normalize_cluster_ordering
-from cluster_tree import copy_tree, prune_tree, prune_n_tree
+from cluster_tree import copy_tree, prune_tree
 
 #Algorithms
 from sklearn.cluster import SpectralClustering
@@ -42,7 +42,7 @@ if __name__ == '__main__':
     #################### RUN PARAMETERS HERE #######################
 
     num_points = 50
-    k = 4
+    k = 2
     min_pts = 3
     mcs = 3
 
@@ -112,26 +112,26 @@ if __name__ == '__main__':
     #                    )
     # labels = np.array([0,1,2,3,4,5,6,7,8,9,10,11])
 
-    # points = np.array([[1,2],
-    #                    [1,4],
-    #                    [2,3],
-    #                    [1,1],
-    #                    [-5,15], #5
-    #                    [11,13],
-    #                    [13,11],
-    #                    [10,8],
-    #                    [14,13],
-    #                    [16,17], #10
-    #                    [18,19],
-    #                    [19,18],
-    #                    [21,24],
-    #                    [11,17],
-    #                    [28,21], #15
-    #                    [10,18],
-    #                    [7,7]
-    #                    ]
-    #                    )
-    # labels = np.array([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16])
+    points = np.array([[1,2],
+                       [1,4],
+                       [2,3],
+                       [1,1],
+                       [-5,15], #5
+                       [11,13],
+                       [13,11],
+                       [10,8],
+                       [14,13],
+                       [16,17], #10
+                       [18,19],
+                       [19,18],
+                       [21,24],
+                       [11,17],
+                       [28,21], #15
+                       [10,18],
+                       [7,7]
+                       ]
+                       )
+    labels = np.array([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16])
     
     #points, labels = create_dataset(num_points=num_points, type=dataset_type, save=save_dataset, load=load_dataset, save_name=save_name, load_name=load_name)
 
@@ -150,21 +150,22 @@ if __name__ == '__main__':
 
     #print("Pred labels:", pred_labels)
     #K-median clustering
-    kmedian = DCKCentroids(k=k, min_pts=min_pts, loss="kmedian", noise_mode="medium")
+    kmedian = DCKCentroids(k=k, min_pts=min_pts, loss="kmedian", noise_mode="full")
     kmedian.fit(points)
 
     kmedian_labels = kmedian.labels_
     kmedian_centers = kmedian.center_indexes
-    plot_tree(n_root, pred_labels, is_binary=False)
 
-    new_root = prune_n_tree(n_root, 4)
-    plot_tree(new_root, pred_labels, is_binary=False)
 
-    kmedian_nary = DCKCentroids_nary(k=k, min_pts=min_pts, loss="kmedian", noise_mode="medium")
+    kmedian_nary = DCKCentroids_nary(k=k, min_pts=min_pts, loss="kmedian", noise_mode="full")
     kmedian_nary.fit(points)
 
     kmedian_labels_nary = kmedian_nary.labels_
     kmedian_centers_nary = kmedian_nary.center_indexes
+    prune_root = prune_n_tree(n_root, min_pts)
+    print("prune_root:", prune_root)
+    plot_tree(prune_root, kmedian_labels_nary, is_binary=False)
+    plot_tree(n_root, kmedian_labels_nary, is_binary=False)
 
 
     #K-means clustering

@@ -66,9 +66,7 @@ class DCKCentroids(object):
       annotations.sort(reverse=True, key=lambda x : x[0]) #Sort by the first value of the tuples - the potential cost-decrease. Reverse=True to get descending order.
       cluster_centers = set() #We should not use the "in" operation, as it is a worst-case O(n) operation. Just add again and again
 
-      # print("Annotations BINARY:")
-      # display_annos = [(x[0], x[1], self.get_leaves(x[2])) for x in annotations]
-      # print(display_annos)
+      print("annotations BINARY:", [(x[1]) for x in annotations])
 
       for annotation in annotations:
          curr_len = len(cluster_centers)
@@ -89,13 +87,13 @@ class DCKCentroids(object):
          self.labels_ = self.assign_points_prune(points, dc_tree)
       elif self.noise_mode == "full":
          self.mark_center_paths(dc_tree, centers)
-         #self.labels_ = self.assign_points_prune_full(points, dc_tree) 
-         self.labels_ = self.assign_points_prune_stability(dc_tree, self.cluster_stability_experimental)      
+         self.labels_ = self.assign_points_prune_full(points, dc_tree) 
+         #self.labels_ = self.assign_points_prune_stability(dc_tree, self.cluster_stability_experimental)      
          
       else: 
          raise AssertionError("The noise detection mode is not recognized. Choose between none, medium or full.")
       
-      print("labels BINIARY:", self.labels_)
+      print("labels BINARY:", self.labels_)
 
       self.center_indexes = centers
       self.centers = points[centers]
@@ -201,7 +199,6 @@ class DCKCentroids(object):
         '''
         if dc_tree.is_leaf:
             if dc_tree.center_path:
-              print("here2")
 
               list.append((dc_tree.point_id, dc_tree.unique_center))
               return []
@@ -213,7 +210,6 @@ class DCKCentroids(object):
 
             all_not_assigned = left_not_assigned + right_not_assigned
             if dc_tree.center_path: #On center path they should be assigned
-               print("here1")
                if dc_tree.num_centers == 1:
                   for p in all_not_assigned:
                      list.append((p, dc_tree.unique_center))

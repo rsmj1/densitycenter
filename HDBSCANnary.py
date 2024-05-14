@@ -241,17 +241,6 @@ class HDBSCAN(object):
                     total_stability += child.size/dc_tree.dist
             return total_stability
 
-            
-
-    def get_tree_size(self, dc_tree):
-        '''
-        Computes the size of the current tree (and by extension current cluster).
-        This algorithm is linear in the number of leaves.
-        '''
-        if dc_tree.is_leaf:
-            return 1
-        else:
-            return self.get_tree_size(dc_tree.left_tree) + self.get_tree_size(dc_tree.right_tree)
         
 
     def get_leaves(self, dc_tree):

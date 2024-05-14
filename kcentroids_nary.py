@@ -2,9 +2,8 @@ import efficientdcdist.dctree as dcdist
 import numpy as np
 import heapq
 import numba
-from density_tree import make_tree
-from cluster_tree import prune_tree, copy_tree
-from n_density_tree import make_n_tree
+from n_density_tree import make_n_tree, prune_n_tree
+
 class DCKCentroids(object):
 
     def __init__(self, *, k, min_pts, loss="kmedian", noise_mode="none"):
@@ -65,9 +64,8 @@ class DCKCentroids(object):
                 annotations = self.prune_annotations(annotations) #This prunes based on occurences in the annotation list.
 
         annotations.sort(reverse=True, key=lambda x : x[0]) #Sort by the first value of the tuples - the potential cost-decrease. Reverse=True to get descending order.
-        #   print("Annotations N-ARY:")
-        #   display_annos = [(x[0], x[1], self.get_leaves(x[2])) for x in annotations]
-        #   print(display_annos)
+        print("annotations NARY:", [(x[1]) for x in annotations])
+
         
         cluster_centers = set() #We should not use the "in" operation, as it is a worst-case O(n) operation. Just add again and again
 
@@ -90,8 +88,8 @@ class DCKCentroids(object):
             self.labels_ = self.assign_points_prune(points, dc_tree)
         elif self.noise_mode == "full":
             self.mark_center_paths(dc_tree, centers)
-            #self.labels_ = self.assign_points_prune_full(points, dc_tree) 
-            self.labels_ = self.assign_points_prune_stability(dc_tree, self.cluster_stability_experimental)      
+            self.labels_ = self.assign_points_prune_full(points, dc_tree) 
+            #self.labels_ = self.assign_points_prune_stability(dc_tree, self.cluster_stability_experimental)      
             
         else: 
             raise AssertionError("The noise detection mode is not recognized. Choose between none, medium or full.")
@@ -255,14 +253,14 @@ class DCKCentroids(object):
                         for child in dc_tree.children:
                             path = list_builder(child, list)
                             if path == 0: #Assign via pruned tree
-                                points, noise = self.prune_cluster_subtree(dc_tree.left_tree, self.min_pts)
-                                center = dc_tree.left_tree.unique_center
+                                points, noise = self.prune_cluster_subtree(child, self.min_pts)
+                                center = child.unique_center
                                 for point in points:
                                     list.append((point, center))  
                                 for point in noise:
                                     list.append((point, -1))
                             elif path == 1: #Assign to noise
-                                noise = self.get_leaves(dc_tree.left_tree)
+                                noise = self.get_leaves(child)
                                 for point in noise: 
                                     list.append((point, -1))
                         return 2 #Points from here are already assigned, so return 2 
@@ -350,23 +348,34 @@ class DCKCentroids(object):
     def prune_cluster_subtree(self, dc_tree, min_pts):
         '''
         Will prune the tree and return the points that should be pruned and those that should be assigned.
+        It will return points below splits in the pruned tree and the actual leaves of the pruned tree as non-noise points. 
         '''
-        pruned_tree = prune_tree(dc_tree, min_pts)
-        if pruned_tree is None:
-            return list(self.get_leaves(dc_tree)), []
-        
-        labels = np.zeros(dc_tree.size)
-        points = list(self.get_leaves(pruned_tree))
-        for point in points:
-            labels[point] = 1
-        noise = []
-        for i, label in enumerate(labels):
-            if label == 0:
-                noise.append(i)
-    
+        pruned_tree = prune_n_tree(dc_tree, min_pts)
+
+        def prune_collector(tree, points_list):
+            if tree.is_leaf:
+                points_list.append(tree.point_id)
+            else:
+                if self.is_split(tree):
+                    for child in tree.children: #Only add the split points to the set of points, not the potential pruned things at that level.
+                        points_list += list(self.get_leaves(child.orig_node))
+                    return
+                
+                for child in tree.children:
+                    prune_collector(child, points_list)
+
+        points, noise = [], []
+        if pruned_tree is None: #If everything is pruned - then it should return the nodes - it does not make sense that everything is noise.. TODO
+            points += self.get_leaves(dc_tree)
+        else:
+            prune_collector(pruned_tree, points)
+            noise = [p for p in self.get_leaves(dc_tree) if p not in points]
         return points, noise
 
     def is_split(self, dc_tree):
+        '''
+        Detects splits in a tree. Mainly used on a pruned tree where you can have less than two children per node. 
+        '''
         num_splits = 0
         for child in dc_tree.children: 
             if child.point_id is None: #If these ids are none they are internal nodes - ergo we have a split in the pruned tree.
@@ -379,25 +388,13 @@ class DCKCentroids(object):
         Will prune the tree and return the points that should be pruned and those that should be assigned.
         This keeps going to the leaves of the pruned tree no matter whether there is a split in the pruned tree or not. 
         '''
-        pruned_tree = prune_tree(dc_tree, min_pts)
-
-        def noise_collector(tree, points_list, noise_list):
-            if tree.is_leaf:
-                if tree.point_id < 0: #This is noise
-                    noise_list += self.get_leaves(tree.orig_node)
-                    return
-                else:
-                    points_list += [tree.point_id]
-            else:
-                noise_collector(tree.left_tree, points_list, noise_list)
-                noise_collector(tree.right_tree, points_list, noise_list)
-
-        points, noise = [],[]
-        if pruned_tree is None: #If everything is pruned
-            noise += self.get_leaves(dc_tree)
-        else:
-            noise_collector(pruned_tree, points, noise)
-
+        pruned_tree = prune_n_tree(dc_tree, min_pts)
+        if pruned_tree is None:
+            return list(self.get_leaves(dc_tree)), []
+        all_points = self.get_leaves(dc_tree)
+        points = list(self.get_leaves(pruned_tree))
+        noise  = [p for p in all_points if p not in points]
+    
         return points, noise
 
     def mark_center_paths(self, dc_tree, centers):
@@ -561,7 +558,7 @@ class DCKCentroids(object):
         The annotations are built up as a list of [(cost-decrease, center, tree),...]
         '''
         #points, _ = self.prune_cluster_subtree(tree, self.min_pts) #This is one option... however this will not prune below splits, which might not be ideal. 
-        points, _ = self.prune_cluster_subtree_aggressive(tree, self.min_pts)
+        points = self.prune_cluster_subtree_aggressive(tree, self.min_pts)
         point_set = set(points)
         #print("point_set:", point_set)
         pruned_annotations = []
