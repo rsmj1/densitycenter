@@ -37,11 +37,12 @@ from kcentroids import DCKCentroids
 from HDBSCANnary import HDBSCAN as HDBSCANnary
 from kcentroids_nary import DCKCentroids as DCKCentroids_nary
 
+import sys
 
 if __name__ == '__main__': 
     #################### RUN PARAMETERS HERE #######################
 
-    num_points = 50
+    num_points = 200
     k = 2
     min_pts = 3
     mcs = 3
@@ -133,9 +134,15 @@ if __name__ == '__main__':
                        )
     labels = np.array([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16])
     
-    #points, labels = create_dataset(num_points=num_points, type=dataset_type, save=save_dataset, load=load_dataset, save_name=save_name, load_name=load_name)
+    points, labels = create_dataset(num_points=num_points, type=dataset_type, save=save_dataset, load=load_dataset, save_name=save_name, load_name=load_name)
 
 
+
+    
+    
+
+
+    
     t1 = time.time()
     root, dc_dists = make_tree(points, labels, min_points=min_pts)
     t2 = time.time()
@@ -145,6 +152,9 @@ if __name__ == '__main__':
     print("binary dctree time:", t2-t1)
 
     print("nary dctree time  :", t3-t2)
+
+
+
     #K-center
     pred_labels, kcenter_centers, epsilons = dc_clustering(root, num_points=len(labels), k=k, min_points=min_pts,with_noise=True)
 
@@ -219,12 +229,6 @@ if __name__ == '__main__':
     k = str(k)
     hk = str(num_clusters)
     hk_new = str(num_clusters_new)
-
-    # print("equal if zero:", np.count_nonzero(normalize_cluster_ordering(hdb_labels) -normalize_cluster_ordering(hdb_new_labels)) )
-    # print("New:", normalize_cluster_ordering(hdb_new_labels))
-    # print("Old:", normalize_cluster_ordering(hdb_labels))
-
-
     
 
 
@@ -235,11 +239,7 @@ if __name__ == '__main__':
 
         #print("kmedian labels:", labels)
         #extra_stabilities = hdbscan_new.extra_annotations
-        #plot_tree(n_root, hdbscan_nary_labels, is_binary=False)
-        plot_tree(root, hdbscan_nary_labels)
-        plot_tree(n_root, hdb_labels, is_binary=False)
-        plot_tree(root, kmedian_labels, kmedian_centers, save=save_visualization, save_name=image_save_name, is_binary=True, extra_annotations=extra_stabilities)
-        plot_tree(n_root, kmedian_labels, kmedian_centers, save=save_visualization, save_name=image_save_name, is_binary=False)
+
 
 
     #Plot the final clustering of the datapoints in 2D euclidean space.

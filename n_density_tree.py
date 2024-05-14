@@ -193,24 +193,116 @@ def prune_n_tree(dc_tree, min_pts, pruned_parent=None):
 
         if pruned_root.is_leaf: #If this node becomes a leaf in the pruned tree, we want its children back again.
             return dc_tree
-        size = len(get_leaves_nary(pruned_root))
+        size = len(get_leaves(pruned_root))
         pruned_root.size = size
         return pruned_root
     else:
         return None
     
 
-def get_leaves_nary(dc_tree):
+def get_leaves(dc_tree):
     '''
     Returns the set of ids of the leaf nodes within the given cluster.
     '''
+    leaves = []
     def leaf_helper(dc_tree):
         if dc_tree.is_leaf:
-            return [dc_tree.point_id]
+            leaves.append(dc_tree.point_id)
         else:
-            leaves = []
             for child in dc_tree.children:
-                leaves += leaf_helper(child)
-            return leaves
-        
-    return np.array(leaf_helper(dc_tree))
+                leaf_helper(child)
+    leaf_helper(dc_tree)
+    return np.array(leaves)
+
+
+
+
+def make_tree(points, min_points):
+    '''
+    Creates the dc-tree in O(n^2) using a direct MST construction via Prim's algorithm. Prim is faster than Kruskal for dense graphs.
+
+    Steps:
+    1. Create the mutual reachability distances:
+        a. This can be done in O(n^2) if we use a kd-tree to find the k-th nearest neighbors for the cdists. 
+            i. This might not be ideal for high dimensional data.
+        b. When we have the cdists, we can get the mutual reachability distances easily in O(n^2)
+    2. Create the MST
+        a. Use Prim's algorithm as we are working with a complete graph, which has a complexity of O(n^2) (or in graph terms O(V^2)) if we provide an adjancency matrix, which is exactly what we output from previous mut reach step.
+        b. Sort the MST edges - there are O(n) edges, so O(n*log(n)).
+    3. Create the DC-tree from this.
+    
+    '''
+
+    complete_graph_mut_reach = get_mutual_reachability_dists(points, min_points)
+
+
+
+    return
+
+    
+
+
+
+
+
+
+
+
+
+
+#Takes as input the euclidean distance matrix D
+def get_reach_dists(D, min_points, num_points):
+    # Get reachability for each point with respect to min_points parameter
+    reach_dists = np.sort(D, axis=1)
+    reach_dists = reach_dists[:, min_points - 1] #These are the core-distances for each point.
+
+    # Make into an NxN matrix
+    reach_dists_i, reach_dists_j = np.meshgrid(reach_dists, reach_dists)
+
+    # Take max of reach_i, D_ij, reach_j
+    D = np.stack([D, reach_dists_i, reach_dists_j], axis=-1)
+    D = np.max(D, axis=-1)
+
+    # Zero out the diagonal so that it's a distance metric
+    diag_mask = np.ones([num_points, num_points]) - np.eye(num_points)
+    D *= diag_mask
+    return D
+
+def get_mutual_reachability_dists(points, min_points=5, **kwargs):
+    """
+    We define the distance from x_i to x_j as min(max(P(x_i, x_j))), where 
+        - P(x_i, x_j) is any path from x_i to x_j
+        - max(P(x_i, x_j)) is the largest edge weight in the path
+        - min(max(P(x_i, x_j))) is the smallest largest edge weight
+    """
+    @nb.njit(fastmath=True, parallel=True)
+    def get_dist_matrix(points, D, dim, num_points):
+        for i in nb.prange(num_points):
+            x = points[i]
+            for j in range(i+1, num_points):
+                y = points[j]
+                dist = 0
+                for d in range(dim):
+                    dist += (x[d] - y[d]) ** 2
+                dist = np.sqrt(dist)
+                D[i, j] = dist
+                D[j, i] = dist
+
+        return D
+
+    num_points = int(points.shape[0])
+    dim = int(points.shape[1])
+    D = np.zeros([num_points, num_points])
+    D = get_dist_matrix(points, D, dim, num_points)
+    if min_points > 1:
+        if min_points > num_points:
+            raise ValueError('Min points cannot exceed the size of the dataset')
+    D = get_reach_dists(D, min_points, num_points)
+    return D
+
+
+
+def get_mut_reach_dists():
+
+
+

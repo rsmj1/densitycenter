@@ -2,7 +2,7 @@ import efficientdcdist.dctree as dcdist
 import numpy as np
 import heapq
 import numba
-from n_density_tree import make_n_tree, prune_n_tree
+from n_density_tree import make_n_tree, prune_n_tree, get_leaves
 
 class DCKCentroids(object):
 
@@ -260,7 +260,7 @@ class DCKCentroids(object):
                                 for point in noise:
                                     list.append((point, -1))
                             elif path == 1: #Assign to noise
-                                noise = self.get_leaves(child)
+                                noise = get_leaves(child)
                                 for point in noise: 
                                     list.append((point, -1))
                         return 2 #Points from here are already assigned, so return 2 
@@ -307,15 +307,15 @@ class DCKCentroids(object):
                             path, below_stability, below_cluster = list_builder(child, list, stability)
 
                             if path == 0:
-                                points = self.get_leaves(below_cluster)
+                                points = get_leaves(below_cluster)
                                 center = child.unique_center
-                                noise = [p for p in self.get_leaves(child) if p not in points]
+                                noise = [p for p in get_leaves(child) if p not in points]
                                 for point in points:
                                     list.append((point, center))  
                                 for point in noise:
                                     list.append((point, -1))
                             elif path == 1:
-                                noise = self.get_leaves(child)
+                                noise = get_leaves(child)
                                 for point in noise: 
                                     list.append((point, -1))
                         return 2, 0, None #Points from here are already assigned, so return 2
@@ -358,7 +358,7 @@ class DCKCentroids(object):
             else:
                 if self.is_split(tree):
                     for child in tree.children: #Only add the split points to the set of points, not the potential pruned things at that level.
-                        points_list += list(self.get_leaves(child.orig_node))
+                        points_list += list(get_leaves(child.orig_node))
                     return
                 
                 for child in tree.children:
@@ -366,10 +366,10 @@ class DCKCentroids(object):
 
         points, noise = [], []
         if pruned_tree is None: #If everything is pruned - then it should return the nodes - it does not make sense that everything is noise.. TODO
-            points += self.get_leaves(dc_tree)
+            points += get_leaves(dc_tree)
         else:
             prune_collector(pruned_tree, points)
-            noise = [p for p in self.get_leaves(dc_tree) if p not in points]
+            noise = [p for p in get_leaves(dc_tree) if p not in points]
         return points, noise
 
     def is_split(self, dc_tree):
@@ -390,9 +390,9 @@ class DCKCentroids(object):
         '''
         pruned_tree = prune_n_tree(dc_tree, min_pts)
         if pruned_tree is None:
-            return list(self.get_leaves(dc_tree)), []
-        all_points = self.get_leaves(dc_tree)
-        points = list(self.get_leaves(pruned_tree))
+            return list(get_leaves(dc_tree)), []
+        all_points = get_leaves(dc_tree)
+        points = list(get_leaves(pruned_tree))
         noise  = [p for p in all_points if p not in points]
     
         return points, noise
@@ -502,22 +502,6 @@ class DCKCentroids(object):
             annotation_builder(tree, output, np.inf, lambda x: x**2) #Using K-means loss
         return output
 
-
-
-    def get_leaves(self, dc_tree):
-            '''
-            Returns the set of ids of the leaf nodes within the given cluster.
-            '''
-            def leaf_helper(dc_tree):
-                if dc_tree.is_leaf:
-                    return [dc_tree.point_id]
-                else:
-                    leaves = []
-                    for child in dc_tree.children:
-                        leaves += leaf_helper(child)
-                    return leaves
-                
-            return np.array(leaf_helper(dc_tree))
     
         
     def prune_annotations(self, annotations):
@@ -627,6 +611,8 @@ class DCKCentroids(object):
         if stability5 == np.inf:
             return 0
         return stability5  
+    
+    
     def cluster_statistics(self, dc_tree):
             '''
             Computes the variance of the dc-distance matrix of the set of nodes and all subsets of it bottom up.

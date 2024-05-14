@@ -1,7 +1,7 @@
 import efficientdcdist.dctree as dcdist
 import numpy as np
 import numba
-from n_density_tree import make_n_tree
+from n_density_tree import make_n_tree, get_leaves
 '''
 Thoughts about HDBSCAN:
 
@@ -124,39 +124,45 @@ class HDBSCAN(object):
 
     def compute_clustering(self, dc_tree, cdists, merge_above=True):
         '''
-        If a cluster has the same stability as the sum of chosen clusters below, it chooses the one above (the larger one).
-        This is in line with the algorithm itself, but also helps us in the case of min_pts = 1, where we have clusters with stability 0.
-        The stability of a cluster is given by: 
+        Main HDBSCAN computation algorithm over the n-ary dc-tree.
 
-            sum_{x in C}(1/emin(x,C) - 1/emax(C))
-        , where emax(C) is the maximal epsilon at which the cluster exists, and emin(x,C) is the level at which a point no longer is part of the cluster and is considered noise.
+        Parameters
+        ----------
 
-        The clusters are propagated bottom up as lists of lists. Each particle in this representation is determined by the size of min_cluster_size.
-        The cluster representation returned is ([cluster1,...,clusterk], stability_sum), where clusteri = [atom1,...,atomt], where atomj = (tree_pointer, tree_size, breakoff_dist).
-        Parent_dist is the maximal point at which the cluster exists.
+        dc_tree : NaryDensityTree
+            The dc-tree over the set of points the HDBSCAN algorithm is run on.
+        cdists : np.array
+            An array of the core-distances between all of the points. 
+        merge_above : Boolean, default=True
+            This indicates whether we have a cluster split from above / a merge from below, meaning that stability computations should be made to evaluate the cluster at this level if True.
         '''
         if self.min_cluster_size > dc_tree.size:
+            #Temp code for stability annotations:
+            var, bar, dsize = self.cluster_statistics(dc_tree)
+            self.extra_annotations.append(var)
+
+
             #print("leaf, returning noise", self.get_leaves(dc_tree)+1)
             return [], 0 #Noise
         else:
+            #Temp code for stability annotations:
+            var, bar, dsize = self.cluster_statistics(dc_tree)
+            self.extra_annotations.append(var)
+
+            #Real code from here and below
             total_stability = 0
             below_clusters = []
             split_size = self.split_size(dc_tree, self.min_cluster_size)
-            leaves = []
-            var, bar, dsize = self.cluster_statistics(dc_tree)
+            
             for child in dc_tree.children:
                 if child.size >= self.min_cluster_size and split_size >= 2: #Currently we do not allow multiple points at the same height (as leaves) to constitute a split.
-                    #print("rec call True", self.get_leaves(dc_tree)+1)
                     clusters, stability = self.compute_clustering(child, cdists, True)
                 else:
-                    #print("rec call False", self.get_leaves(dc_tree)+1)
-
                     clusters, stability = self.compute_clustering(child, cdists, False)
 
                 total_stability += stability
                 below_clusters += clusters
-                if child.is_leaf:
-                    leaves.append(child.point_id)
+
 
             if merge_above: #When we have a merge above, we know that this current subtree in its entirety might constitute a cluster depending on stability computations within it.                
                 if dc_tree.parent is None: #Root call
@@ -242,22 +248,8 @@ class HDBSCAN(object):
             return total_stability
 
         
-
-    def get_leaves(self, dc_tree):
-        '''
-        Returns the set of ids of the leaf nodes within the given cluster.
-        '''
-        def leaf_helper(dc_tree):
-            if dc_tree.is_leaf:
-                return [dc_tree.point_id]
-            else:
-                leaves = []
-                for child in dc_tree.children:
-                    leaves += leaf_helper(child)
-                return leaves
-            
-        return np.array(leaf_helper(dc_tree))
-
+    
+    
     def label_clusters(self, clustering, n):
         '''
         Given a clustering CL with |CL|=k, it labels the clusters C in CL from 0 to k-1. All points not in clusters are labelled as noise, -1.
@@ -265,15 +257,12 @@ class HDBSCAN(object):
         curr_label = 0
         output_labels = np.zeros(n) -1
         for cluster in clustering:
-            points = self.get_leaves(cluster)
+            points = get_leaves(cluster)
             for point in points:
                 output_labels[point] = curr_label
             curr_label += 1
 
         return output_labels
-
-
-
 
 
 
