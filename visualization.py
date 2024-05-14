@@ -455,6 +455,7 @@ def plot_tree(root, labels=None, centers=None, save=False, save_name=None, is_bi
     extra_annotations, Numpy.Array, default=None
       The annotations should be provided in preorder traversal order over the binary tree.
     '''
+
     if labels is None:
        labels = np.arange(root.size)
     dist_dict = {}
@@ -476,6 +477,11 @@ def plot_tree(root, labels=None, centers=None, save=False, save_name=None, is_bi
 
     G = nx.Graph()
     G.add_edges_from(edge_list)
+
+    if extra_annotations is not None and len(extra_annotations) != G.number_of_nodes():
+      print("You should only use extra annotations with mcs <= 2!")
+      raise AssertionError("Extra annotations are not compatible!")       
+
 
     extra_dict = {}
     pos_dict = {}

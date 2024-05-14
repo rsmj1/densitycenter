@@ -230,7 +230,7 @@ def make_tree(points, min_points):
         a. Use Prim's algorithm as we are working with a complete graph, which has a complexity of O(n^2) (or in graph terms O(V^2)) if we provide an adjancency matrix, which is exactly what we output from previous mut reach step.
         b. Sort the MST edges - there are O(n) edges, so O(n*log(n)).
     3. Create the DC-tree from this.
-    
+
     '''
 
     complete_graph_mut_reach = get_mutual_reachability_dists(points, min_points)
@@ -301,8 +301,6 @@ def get_mutual_reachability_dists(points, min_points=5, **kwargs):
     return D
 
 
-
-def get_mut_reach_dists():
 
 
 

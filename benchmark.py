@@ -33,6 +33,10 @@ from HDBSCAN import HDBSCAN as newScan
 from kmedian import DCKMedian
 from kcentroids import DCKCentroids
 
+from kcentroids_nary import DCKCentroids as DCKCentroidsNary
+from HDBSCANnary import HDBSCAN as HDBSCANNary
+
+
 from point_gen import create_hierarchical_clusters
 from visualization import visualize, print_numpy_code
 from itertools import chain, combinations
@@ -501,7 +505,7 @@ def benchmark_single(points, runtype, k, min_pts, eps):
             k -= 1
         used_min_pts = min_pts
     elif runtype == "HDBSCAN_NEW":
-        hdbscan_new = newScan(min_samples = min_pts, min_cluster_size=2)
+        hdbscan_new = HDBSCANNary(min_samples = min_pts, min_cluster_size=2)
         hdbscan_new.fit(points)
         labels = hdbscan.labels_
         k = len(np.unique(labels))
@@ -517,39 +521,39 @@ def benchmark_single(points, runtype, k, min_pts, eps):
             k -= 1
         used_min_pts = min_pts
         used_eps = eps
-    elif runtype == "KMEANS":
+    elif runtype == "KMEANS": #SKLEARN Kmeans
         kmeans = KMeans(n_clusters=k, n_init="auto")
         kmeans.fit(points)
         labels = kmeans.labels_
 
     elif runtype == "DCKMEANS":
-        dckmeans = DCKMeans(k=k, min_pts=min_pts)
+        dckmeans = DCKCentroidsNary(k=k, min_pts=min_pts, loss="kmeans", noise_mode="none")
         dckmeans.fit(points)
         labels = dckmeans.labels_
         used_min_pts = min_pts
     elif runtype == "DCKMEANS_MED":
-        dckmeans = DCKCentroids(k=k, min_pts=min_pts, loss="kmeans", noise_mode="medium")
+        dckmeans = DCKCentroidsNary(k=k, min_pts=min_pts, loss="kmeans", noise_mode="medium")
         dckmeans.fit(points)
         labels = dckmeans.labels_
         used_min_pts = min_pts
     elif runtype == "DCKMEANS_FULL":
-        dckmeans = DCKCentroids(k=k, min_pts=min_pts, loss="kmeans", noise_mode="full")
+        dckmeans = DCKCentroidsNary(k=k, min_pts=min_pts, loss="kmeans", noise_mode="full")
         dckmeans.fit(points)
         labels = dckmeans.labels_
         used_min_pts = min_pts
 
     elif runtype == "DCKMEDIAN":
-        dckmedian = DCKMedian(k=k, min_pts=min_pts)
+        dckmedian = DCKCentroidsNary(k=k, min_pts=min_pts, loss="kmedian", noise_mode="none")
         dckmedian.fit(points)
         labels = dckmedian.labels_
         used_min_pts = min_pts
     elif runtype == "DCKMEDIAN_MED":
-        dckmeans = DCKCentroids(k=k, min_pts=min_pts, loss="kmedian", noise_mode="medium")
+        dckmeans = DCKCentroidsNary(k=k, min_pts=min_pts, loss="kmedian", noise_mode="medium")
         dckmeans.fit(points)
         labels = dckmeans.labels_
         used_min_pts = min_pts
     elif runtype == "DCKMEDIAN_FULL":
-        dckmeans = DCKCentroids(k=k, min_pts=min_pts, loss="kmedian", noise_mode="full")
+        dckmeans = DCKCentroidsNary(k=k, min_pts=min_pts, loss="kmedian", noise_mode="full")
         dckmeans.fit(points)
         labels = dckmeans.labels_
         used_min_pts = min_pts
