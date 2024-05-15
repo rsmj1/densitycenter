@@ -69,6 +69,8 @@ class DCKCentroids(object):
         
         cluster_centers = set() #We should not use the "in" operation, as it is a worst-case O(n) operation. Just add again and again
 
+        cluster_order_centers = []
+
         for annotation in annotations:
             curr_len = len(cluster_centers)
             if curr_len >= self.k:
@@ -78,6 +80,7 @@ class DCKCentroids(object):
             if curr_len != new_len: #This janky setup is to make sure we do not need to use the "in" operation which has a worst-case O(n) complexity
                 annotation[2].chosen = True
                 annotation[2].best_center = annotation[1] 
+                cluster_order_centers.append(annotation[1])
         
         #Now we just need to assign the points to the clusters.
         centers = list(cluster_centers)
@@ -96,7 +99,7 @@ class DCKCentroids(object):
         
         print("labels N-ary:", self.labels_)
 
-        self.center_indexes = centers
+        self.center_indexes = cluster_order_centers
         self.centers = points[centers]
         return
 
@@ -692,3 +695,8 @@ class DCKCentroids(object):
                 D[i, j] = dist
                 D[j, i] = dist
         return D
+    
+
+
+
+    #def define_cluster_hierarchy():

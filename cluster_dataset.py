@@ -42,17 +42,17 @@ import sys
 if __name__ == '__main__': 
     #################### RUN PARAMETERS HERE #######################
 
-    num_points = 200
-    k = 2
+    num_points = 50
+    k = 17
     min_pts = 3
     mcs = 2
 
     plot_tree_bool = False  
     n_neighbors = 15
     eps = 2
-    dataset_type = "moon" 
+    dataset_type = "circle" 
     save_dataset = False
-    load_dataset = True #If true will override the other params and just load from the filename.
+    load_dataset = False #If true will override the other params and just load from the filename.
     save_name = "debugstability" #Shared for name of images, filename to save the dataset into
     load_name = "debugstability"
 
@@ -134,7 +134,7 @@ if __name__ == '__main__':
                        )
     labels = np.array([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16])
     
-    #points, labels = create_dataset(num_points=num_points, type=dataset_type, save=save_dataset, load=load_dataset, save_name=save_name, load_name=load_name)
+    points, labels = create_dataset(num_points=num_points, type=dataset_type, save=save_dataset, load=load_dataset, save_name=save_name, load_name=load_name)
 
 
 
@@ -160,7 +160,7 @@ if __name__ == '__main__':
 
 
 
-    kmedian_nary = DCKCentroids_nary(k=k, min_pts=min_pts, loss="kmedian", noise_mode="full")
+    kmedian_nary = DCKCentroids_nary(k=k, min_pts=min_pts, loss="kmedian", noise_mode="none")
     kmedian_nary.fit(points)
 
     kmedian_labels_nary = kmedian_nary.labels_
@@ -226,6 +226,7 @@ if __name__ == '__main__':
     #Plot the complete graph from the dataset with the specified distance measure on all of the edges. Optionally show the distances in embedded space with MDS.
     if points.shape[0] < 100:
         #visualize(points=points, cluster_labels=hdb_labels, minPts=min_pts, distance="dc_dist", centers=centers, save=save_visualization, save_name=image_save_name)
+        print("kmedian centers:", np.array(kmedian_nary.center_indexes)+1)
 
         plot_tree(n_root, labels=hdbscan_nary_labels, is_binary=False, extra_annotations=hdbscan_nary.extra_annotations)
 
@@ -233,13 +234,13 @@ if __name__ == '__main__':
 
     #Plot the final clustering of the datapoints in 2D euclidean space.
     plot_points = points
-    # plot_embedding(
-    #     plot_points,
-    #     [hdb_new_labels         , hdb_labels],
-    #     ['(new)HDBSCAN' + hk_new, "HDBSCAN"+hk],
-    #     centers=centers,
-    #     dot_scale=1
-    # )
+    plot_embedding(
+        plot_points,
+        [hdbscan_nary_labels         , hdb_labels],
+        ['HDBSCAN nary', "HDBSCAN"],
+        centers=centers,
+        dot_scale=1
+    )
 
     plot_embedding(
         plot_points,

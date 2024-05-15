@@ -66,7 +66,7 @@ class DCKCentroids(object):
       annotations.sort(reverse=True, key=lambda x : x[0]) #Sort by the first value of the tuples - the potential cost-decrease. Reverse=True to get descending order.
       cluster_centers = set() #We should not use the "in" operation, as it is a worst-case O(n) operation. Just add again and again
 
-      print("annotations BINARY:", [(x[1]) for x in annotations])
+      #print("annotations BINARY:", [(x[1]) for x in annotations])
 
       for annotation in annotations:
          curr_len = len(cluster_centers)
@@ -93,7 +93,7 @@ class DCKCentroids(object):
       else: 
          raise AssertionError("The noise detection mode is not recognized. Choose between none, medium or full.")
       
-      print("labels BINARY:", self.labels_)
+      #print("labels BINARY:", self.labels_)
 
       self.center_indexes = centers
       self.centers = points[centers]
@@ -124,7 +124,7 @@ class DCKCentroids(object):
            if curr_value < best_value:
               best_value = curr_value
               best_new_point = j
-        print("best value:", best_value)
+        #print("best value:", best_value)
         centers[i] = best_new_point
         centers_lookup.add(best_new_point)
 
@@ -222,7 +222,7 @@ class DCKCentroids(object):
 
 
      list_builder(dc_tree, output)
-     print("output:", output)
+     #print("output:", output)
      return self.tuple_labels_to_labels(output)
         
 
@@ -284,7 +284,7 @@ class DCKCentroids(object):
                return 1
 
      list_builder(dc_tree, output)
-     print("output:", output)
+     #print("output:", output)
      return self.tuple_labels_to_labels(output)
 
   def assign_points_prune_stability(self, dc_tree, stability_function):
@@ -366,7 +366,7 @@ class DCKCentroids(object):
                return 1, 0, None
 
      list_builder(dc_tree, output, stability_function)
-     print("output:", output)
+     #print("output:", output)
      return self.tuple_labels_to_labels(output)
 
 

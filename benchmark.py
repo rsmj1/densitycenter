@@ -55,7 +55,7 @@ def create_dataset(num_points, type, save=False, load=False, save_name=None, loa
         The number of points to be created.
     
     type : String
-        The dataset type. Options: moon, gauss, circle, synth, coil, mnist
+        The dataset type. Options: moon, gauss, circle, con_circle, blobs, gauss_quantiles, swiss_rolls, s_curve, friedman, classification, regression, compound, worms, aggregate, synth, coil, mnist
     
     save : Bool, default=False
         If true, saves the generated dataset and its ground truth labels in .csv files under the provided save_name.
@@ -152,7 +152,6 @@ def create_dataset(num_points, type, save=False, load=False, save_name=None, loa
             #The coil100 dataset
             points, labels = get_dataset('coil', class_list=np.arange(1, num_classes), points_per_class=(num_points//num_classes))
         
-
 
     return points, labels
 
