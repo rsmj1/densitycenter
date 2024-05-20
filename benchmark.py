@@ -47,7 +47,7 @@ warnings.filterwarnings('ignore')
 
 
 
-def create_dataset(num_points, type, save=False, load=False, save_name=None, load_name=None, num_classes=6, k=4, num_features=2, noise=0.1):
+def create_dataset(num_points, datatype, save=False, load=False, save_name=None, load_name=None, num_classes=6, k=4, num_features=2, noise=0.1):
     """
     Parameters
     ----------
@@ -55,8 +55,9 @@ def create_dataset(num_points, type, save=False, load=False, save_name=None, loa
         The number of points to be created.
     
     type : String
-        The dataset type. Options: moon, gauss, circle, con_circle, blobs, gauss_quantiles, swiss_rolls, s_curve, friedman, classification, regression, compound, worms, aggregate, synth, coil, mnist
-    
+        The dataset type. Options: 
+         2d: moon, gauss, circle, con_circles, blobs, gauss_quantiles, classification, regression, compound, worms, aggregate
+        >2d: swiss_rolls, s_curve, friedman, synth, coil, mnist
     save : Bool, default=False
         If true, saves the generated dataset and its ground truth labels in .csv files under the provided save_name.
     
@@ -82,76 +83,81 @@ def create_dataset(num_points, type, save=False, load=False, save_name=None, loa
     else: 
         ##### Synthetic datasets #####
 
-        if type == "moon":
+        if datatype == "moon":
             #Creates two half-moons in a "yin-yang" shape
             points, labels = make_moons(n_samples=num_points, noise=noise)
-        elif type == "gauss":
+        elif datatype == "gauss":
             #This does not have ground truth labels, so just use sklearn kmeans over euclidean distance as "ground truth"
             points = create_hierarchical_clusters(n=num_points, unique_vals=True)
             euclid_kmeans = KMeans(n_clusters=k)
             euclid_kmeans.fit(points)
             labels = euclid_kmeans.labels_
-        elif type == "circle":
+        elif datatype == "circle":
             #Generates circles - with given thicknesses and radii. This is a "homebrewed method"
             points, labels = make_circles(n_samples=num_points, noise=noise, radii=[0.5, 1.0], thicknesses=[0.1, 0.1])
-        elif type == "con_circles":
+        elif datatype == "con_circles":
             #Generates two circles within each other (concentric circles) - 2d circles
             points, labels = make_circles_sklearn(n_samples=num_points, noise=noise)
-        elif type == "blobs":
+        elif datatype == "blobs":
             #The cluster_std is the density of each blob essentially.
             points, labels = make_blobs(n_samples=num_points, centers=5, cluster_std=[1.0, 2.0, 3.0, 4.0, 2.5])
-        elif type == "gauss_quantiles":
+        elif datatype == "gauss_quantiles":
             points, labels = make_gaussian_quantiles(n_samples=num_points, n_features=num_features, n_classes=num_classes, cov=2.0)
-        elif type == "swiss_rolls":
+        elif datatype == "classification":
+            #n_informative is relative to n_features the amount of the features that actually help in the classification
+            points, labels = make_classification(n_samples=num_points, n_features=num_features, n_informative=num_features//2, n_classes=num_classes)
+        elif datatype == "regression":
+            #A regression problem, similar thought process to classification above.
+            points, labels = make_regression(n_samples=num_points, n_features=num_features, n_informative=num_features//2, n_classes=num_classes)
+
+        # More than 2 features: Not for plotting.
+        elif datatype == "swiss_rolls":
             #Literally creates a "roll" of the points in 3d - 3 features for each point.
             points, labels = make_swiss_roll(n_samples=num_points, noise=noise)
-        elif type == "s_curve":
+        elif datatype == "s_curve":
             #Outputs 3d points in an s-curve shape.
             points, labels = make_s_curve(n_samples=num_points, noise=noise)
-        elif type == "friedman":
+        elif datatype == "friedman":
             #Has at least 5 features and generates points from random vectors with each entry in [0,1] transformed via: 10 * sin(pi * X[:, 0] * X[:, 1]) + 20 * (X[:, 2] - 0.5) ** 2 + 10 * X[:, 3] + 5 * X[:, 4] + noise * N(0, 1).
             #The rest of the features are not transformed.
             if num_features < 5:
                 points, labels = make_friedman1(n_samples=num_points, n_features=5, noise=noise)
             else:
                 points, labels = make_friedman1(n_samples=num_points, n_features=num_features, noise=noise)
-        elif type == "classification":
-            #n_informative is relative to n_features the amount of the features that actually help in the classification
-            points, labels = make_classification(n_samples=num_points, n_features=num_features, n_informative=num_features//2, n_classes=num_classes)
-        elif type == "regression":
-            #A regression problem, similar thought process to classification above.
-            points, labels = make_regression(n_samples=num_points, n_features=num_features, n_informative=num_features//2, n_classes=num_classes)
-
-        #Datasets from https://cs.joensuu.fi/sipu/datasets/
-        elif type == "compound":
+        
+        #Datasets from https://cs.joensuu.fi/sipu/datasets/ These are also 2d.
+        elif datatype == "compound":
 
             points, labels = load_txt_datasets("compound")
-        elif type == "worms":
+        elif datatype == "worms":
             points, _ = load_txt_datasets("worms_2d")
             euclid_kmeans = KMeans(n_clusters=k)
             euclid_kmeans.fit(points)
             labels = euclid_kmeans.labels_
 
-        elif type == "aggregate":
+        elif datatype == "aggregate":
             points, labels = load_txt_datasets("aggregate")
                 
         ##### Toy datasets #####
-        elif type == "synth":
+        elif datatype == "synth":
             points, labels = get_dataset('synth', num_classes=num_classes, points_per_class=(num_points//num_classes))
-        elif type == "mnist":
+        elif datatype == "mnist":
             #Just loads the mnist dataset, ignoring the other parameters in this call.
             points, labels = get_dataset('mnist', num_classes=num_classes, points_per_class=(num_points//num_classes))
+
+
+        ##### Benchmark datasets #####
+        elif datatype == "coil": 
+            #The coil100 dataset
+            points, labels = get_dataset('coil', class_list=np.arange(1, num_classes), points_per_class=(num_points//num_classes))
+        else:
+            raise AssertionError("Dataset type \"" + datatype + "\" does not exist. Stopping...")
+        
         if save:
             if save_name is None:
                 save_name = str(datetime.now())
             np.savetxt("savefiles/datasets/"+save_name+'.csv', points, delimiter=',')
             np.savetxt("savefiles/datasets/"+save_name+'_labels.csv', labels, delimiter=',')
-
-        ##### Benchmark datasets #####
-        elif type == "coil": 
-            #The coil100 dataset
-            points, labels = get_dataset('coil', class_list=np.arange(1, num_classes), points_per_class=(num_points//num_classes))
-        
 
     return points, labels
 
@@ -236,7 +242,7 @@ def brute_force_comparision(num_points, min_pts, max_iters=100):
 
         dataset_type = "moon"
         #Generate the dataset
-        points, _ = create_dataset(num_points=num_points, type=dataset_type, save=False, load=False)
+        points, _ = create_dataset(num_points=num_points, datatype=dataset_type, save=False, load=False)
         
         dc_tree = dcdist.DCTree(points, min_points=min_pts, n_jobs=1)
 

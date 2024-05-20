@@ -364,7 +364,6 @@ class HDBSCAN(object):
     
 
 
-
     def compute_clustering_general(self, dc_tree, cdists, stability_function):
         '''
         Main HDBSCAN computation algorithm over the n-ary dc-tree.
@@ -406,16 +405,8 @@ class HDBSCAN(object):
                 total_stability += stability
                 below_clusters += clusters
 
-
             if dc_tree.parent is None: #Root call
-                #print("Root call check!")
-                if len(below_clusters) <= 1:
-                    if self.allow_single_cluster:
-                        return [dc_tree]
-                    else:
-                        return []
-                else:
-                    return below_clusters
+                return below_clusters
                 
             else: #We compute the stability only here - all our stability measurements work bottom up - so even for the "new" stability measurement, we can just continue working up from the previous "checkpoint".
                 new_stability = stability_function(dc_tree, cdists)

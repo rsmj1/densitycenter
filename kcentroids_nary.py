@@ -3,6 +3,7 @@ import numpy as np
 import heapq
 import numba
 from n_density_tree import make_n_tree, prune_n_tree, get_leaves
+from density_tree import DensityTree
 
 class DCKCentroids(object):
 
@@ -63,27 +64,10 @@ class DCKCentroids(object):
                 #annotations1 = self.prune_annotations_other(dc_tree, annotations) #This prunes based on the pruned tree. This is always slightly less aggressive than the one below. 
                 annotations = self.prune_annotations(annotations) #This prunes based on occurences in the annotation list.
 
-        annotations.sort(reverse=True, key=lambda x : x[0]) #Sort by the first value of the tuples - the potential cost-decrease. Reverse=True to get descending order.
-        print("annotations NARY:", [(x[1]) for x in annotations])
 
-        
-        cluster_centers = set() #We should not use the "in" operation, as it is a worst-case O(n) operation. Just add again and again
-
-        cluster_order_centers = []
-
-        for annotation in annotations:
-            curr_len = len(cluster_centers)
-            if curr_len >= self.k:
-                break
-            cluster_centers.add(annotation[1])
-            new_len = len(cluster_centers)
-            if curr_len != new_len: #This janky setup is to make sure we do not need to use the "in" operation which has a worst-case O(n) complexity
-                annotation[2].chosen = True
-                annotation[2].best_center = annotation[1] 
-                cluster_order_centers.append(annotation[1])
-        
         #Now we just need to assign the points to the clusters.
-        centers = list(cluster_centers)
+        centers = self.pick_centers(annotations, self.k)
+
         if self.noise_mode == "none":
             self.labels_ = self.assign_points_eff(points, dc_tree)
         elif self.noise_mode == "medium":
@@ -97,9 +81,8 @@ class DCKCentroids(object):
         else: 
             raise AssertionError("The noise detection mode is not recognized. Choose between none, medium or full.")
         
-        print("labels N-ary:", self.labels_)
 
-        self.center_indexes = cluster_order_centers
+        self.center_indexes = centers
         self.centers = points[centers]
         return
 
@@ -128,7 +111,7 @@ class DCKCentroids(object):
                 if curr_value < best_value:
                     best_value = curr_value
                     best_new_point = j
-            print("best value:", best_value)
+            #print("best value:", best_value)
             centers[i] = best_new_point
             centers_lookup.add(best_new_point)
 
@@ -225,7 +208,7 @@ class DCKCentroids(object):
 
 
         list_builder(dc_tree, output)
-        print("output:", output)
+        #print("output:", output)
         return self.tuple_labels_to_labels(output)
             
 
@@ -271,7 +254,7 @@ class DCKCentroids(object):
                     return 1
 
         list_builder(dc_tree, output)
-        print("output:", output)
+        #print("output:", output)
         return self.tuple_labels_to_labels(output)
 
     def assign_points_prune_stability(self, dc_tree, stability_function):
@@ -328,7 +311,7 @@ class DCKCentroids(object):
                     return 1, 0, None
 
         list_builder(dc_tree, output, stability_function)
-        print("output:", output)
+        #print("output:", output)
         return self.tuple_labels_to_labels(output)
 
 
@@ -696,7 +679,87 @@ class DCKCentroids(object):
                 D[j, i] = dist
         return D
     
+    def pick_centers(self, annotations, k):
+        '''
+        Picks the set of centers a provided list of annotations. 
+        Returns the chosen centers as a list in the order they were picked.
+        '''
+        annotations.sort(reverse=True, key=lambda x : x[0]) #Sort by the first value of the tuples - the potential cost-decrease. Reverse=True to get descending order.
 
+        cluster_centers = set() #We should not use the "in" operation, as it is a worst-case O(n) operation. Just add again and again
 
+        cluster_order_centers = []
 
-    #def define_cluster_hierarchy():
+        for annotation in annotations:
+            curr_len = len(cluster_centers)
+            if curr_len >= k:
+                break
+            cluster_centers.add(annotation[1])
+            new_len = len(cluster_centers)
+            if curr_len != new_len: #This janky setup is to make sure we do not need to use the "in" operation which has a worst-case O(n) complexity
+                annotation[2].chosen = True
+                annotation[2].best_center = annotation[1] 
+                cluster_order_centers.append(annotation[1])
+        return cluster_order_centers
+
+    def define_cluster_hierarchy(self, points):
+        n = points.shape[0]
+        placeholder = np.zeros(n)
+        dc_tree, _ = make_n_tree(points, placeholder, min_points=self.min_pts, )
+        annotations = self.annotate_tree(dc_tree) #Will use K-means or K-median loss depending on self.loss
+        centers = self.pick_centers(annotations, n) #We need the full hierarchy, so choose k=n for amount of centers.
+        return self.construct_centroid_hierarchy(dc_tree, centers)
+
+    def construct_centroid_hierarchy(self, dc_tree, centers, tiebreaker=None, parent=None):
+        '''
+        Tiebreaker is the current center that will take all the equidistant points in their cluster in next layer of recursion.
+        We already have the full set of points in "centers".
+        '''
+        if len(centers == 1):
+            return DensityTree(centers[0], parent)
+        else:
+
+            if tiebreaker is None:
+                root = DensityTree(centers[0], parent)
+            else:
+                root = DensityTree(tiebreaker, parent)
+            split_node, _ = self.find_lca_set(dc_tree, centers[0], centers[1]) #centers[0] is the current center, centers[1] is the new center. 
+            new_split_set = get_leaves(split_node[0][1])
+            remaining_set_ordered = [center for center in centers if center not in new_split_set] #We let remaining be left
+            new_split_set_ordered = [center for center in centers if center in new_split_set] #New is right. We use this instead of new_split_set, since we want to maintain the center choice ordering.
+            root.set_left_tree(self.construct_centroid_hierarchy(dc_tree, remaining_set_ordered, centers[0], root))
+            root.set_right_tree(self.construct_centroid_hierarchy(split_node[0][1], new_split_set_ordered, centers[1], root))
+
+            return root
+
+        
+    def find_lca_set(self, dc_tree, old_center, new_center):
+        '''
+        Finds the set of unique points for the new center, given the old center.
+        '''
+        if dc_tree.is_leaf:
+            if dc_tree.point_id == old_center:
+                return [[old_center, dc_tree]], False #Keep track of the child that generates this path
+            elif dc_tree.point_id == new_center:
+                return [[new_center, dc_tree]], False
+            else:
+                return []
+        else:
+            union_path = []
+            for child in dc_tree.children:
+                below_path, is_done = self.find_lca_set(child, old_center, new_center)
+                union_path += below_path
+                if is_done:
+                    return union_path, True    
+            if len(union_path) == 1:
+                union_path[0][1] = dc_tree
+                return union_path, False
+            if len(union_path) == 2:
+                if union_path[0][0] == new_center:
+                    union_path[0][1] = dc_tree
+                    return union_path[0], True
+                else:
+                    union_path[1][1] = dc_tree
+                    return union_path[1], True
+            else:
+                return [], False

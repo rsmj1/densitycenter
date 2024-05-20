@@ -37,13 +37,34 @@ from kcentroids import DCKCentroids
 from HDBSCANnary import HDBSCAN as HDBSCANnary
 from kcentroids_nary import DCKCentroids as DCKCentroids_nary
 
-import sys
+
+
+def runtime_save(points, labels, load_dataset):
+    '''
+    Function used to save the provided dataset during runtime. 
+    Can be "plugged in" after any plot that might make you want to decide on whether to keep the dataset or not.
+    '''
+    if not load_dataset:
+        while True:
+            command = input("Enter 'save' to save data points, or 'exit' to exit: ")
+            if command.lower() == 'save':
+                save_name = str(datetime.now())
+                save_name = input("Enter filename to save dataset: ")
+                np.savetxt("savefiles/datasets/"+save_name+'.csv', points, delimiter=',')
+                np.savetxt("savefiles/datasets/"+save_name+'_labels.csv', labels, delimiter=',')
+                print("Saved the dataset.")
+                break
+            else:
+                print("Did not save the dataset.") 
+                break
+
+
 
 if __name__ == '__main__': 
     #################### RUN PARAMETERS HERE #######################
 
     num_points = 50
-    k = 17
+    k = 8
     min_pts = 3
     mcs = 2
 
@@ -52,9 +73,9 @@ if __name__ == '__main__':
     eps = 2
     dataset_type = "circle" 
     save_dataset = False
-    load_dataset = False #If true will override the other params and just load from the filename.
+    load_dataset = True #If true will override the other params and just load from the filename.
     save_name = "debugstability" #Shared for name of images, filename to save the dataset into
-    load_name = "debugstability"
+    load_name = "meeting_example"
 
     #visualization parameters - comment in or out the visualization tools in the section below
     save_visualization = False
@@ -134,7 +155,8 @@ if __name__ == '__main__':
                        )
     labels = np.array([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16])
     
-    points, labels = create_dataset(num_points=num_points, type=dataset_type, save=save_dataset, load=load_dataset, save_name=save_name, load_name=load_name)
+    dataset_type = "con_circles" 
+    points, labels = create_dataset(num_points=num_points, datatype=dataset_type, save=save_dataset, load=load_dataset, save_name=save_name, load_name=load_name)
 
 
 
@@ -228,8 +250,9 @@ if __name__ == '__main__':
         #visualize(points=points, cluster_labels=hdb_labels, minPts=min_pts, distance="dc_dist", centers=centers, save=save_visualization, save_name=image_save_name)
         print("kmedian centers:", np.array(kmedian_nary.center_indexes)+1)
 
-        plot_tree(n_root, labels=hdbscan_nary_labels, is_binary=False, extra_annotations=hdbscan_nary.extra_annotations)
+        plot_tree(n_root, labels=hdbscan_nary_labels, centers = kmedian_nary.center_indexes, is_binary=False, extra_annotations=hdbscan_nary.extra_annotations)
 
+        runtime_save(points, labels, load_dataset) #Enable this to have the option to save a dataset during runtime via the command line.
 
 
     #Plot the final clustering of the datapoints in 2D euclidean space.
@@ -257,3 +280,6 @@ if __name__ == '__main__':
         centers=centers,
         dot_scale=0.5
     )
+
+
+
