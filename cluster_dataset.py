@@ -156,7 +156,7 @@ if __name__ == '__main__':
     labels = np.array([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16])
     
     dataset_type = "con_circles" 
-    points, labels = create_dataset(num_points=num_points, datatype=dataset_type, save=save_dataset, load=load_dataset, save_name=save_name, load_name=load_name)
+    #points, labels = create_dataset(num_points=num_points, datatype=dataset_type, save=save_dataset, load=load_dataset, save_name=save_name, load_name=load_name)
 
 
 
@@ -188,8 +188,8 @@ if __name__ == '__main__':
     kmedian_labels_nary = kmedian_nary.labels_
     kmedian_centers_nary = kmedian_nary.center_indexes
 
-
-
+    new_hierarchy = kmedian_nary.define_cluster_hierarchy(points)
+    plot_tree(new_hierarchy, is_binary=True)
     #K-means clustering
     kmeans = DCKCentroids(k=k, min_pts=min_pts, loss="kmeans", noise_mode="none")
     kmeans.fit(points)

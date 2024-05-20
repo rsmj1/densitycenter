@@ -702,33 +702,48 @@ class DCKCentroids(object):
                 cluster_order_centers.append(annotation[1])
         return cluster_order_centers
 
+
+    # CLUSTER HIERARCHY OUTPUTTING
+
+
     def define_cluster_hierarchy(self, points):
+        '''
+        O(n^2) implementation currently. 
+        Constructs the tree-hierarchy defined by the ordering of the n centers chosen.
+        The internal nodes have as their "dist" the center it corresponds to choosing by choosing that node. 
+        The leaves just have the node itself as point_id - this also implies that the center chosen to get that node is indeed that node.
+
+
+        Parameters
+        ----------
+        points : The set of points over which to create the hierarchy.
+        '''
         n = points.shape[0]
         placeholder = np.zeros(n)
         dc_tree, _ = make_n_tree(points, placeholder, min_points=self.min_pts, )
         annotations = self.annotate_tree(dc_tree) #Will use K-means or K-median loss depending on self.loss
         centers = self.pick_centers(annotations, n) #We need the full hierarchy, so choose k=n for amount of centers.
-        return self.construct_centroid_hierarchy(dc_tree, centers)
+        return self.construct_centroid_hierarchy_helper(dc_tree, centers)
 
-    def construct_centroid_hierarchy(self, dc_tree, centers, tiebreaker=None, parent=None):
+    def construct_centroid_hierarchy_helper(self, dc_tree, centers, parent=None):
         '''
         Tiebreaker is the current center that will take all the equidistant points in their cluster in next layer of recursion.
         We already have the full set of points in "centers".
         '''
-        if len(centers == 1):
-            return DensityTree(centers[0], parent)
+        if len(centers) == 1:
+            leaf = DensityTree(0, parent, size=1)
+            leaf.point_id = centers[0]
+            return leaf
         else:
+            root = DensityTree(centers[0]+1 , parent, size=len(centers))
 
-            if tiebreaker is None:
-                root = DensityTree(centers[0], parent)
-            else:
-                root = DensityTree(tiebreaker, parent)
             split_node, _ = self.find_lca_set(dc_tree, centers[0], centers[1]) #centers[0] is the current center, centers[1] is the new center. 
-            new_split_set = get_leaves(split_node[0][1])
+            new_split_set = set(get_leaves(split_node[1]))
             remaining_set_ordered = [center for center in centers if center not in new_split_set] #We let remaining be left
             new_split_set_ordered = [center for center in centers if center in new_split_set] #New is right. We use this instead of new_split_set, since we want to maintain the center choice ordering.
-            root.set_left_tree(self.construct_centroid_hierarchy(dc_tree, remaining_set_ordered, centers[0], root))
-            root.set_right_tree(self.construct_centroid_hierarchy(split_node[0][1], new_split_set_ordered, centers[1], root))
+            
+            root.set_left_tree(self.construct_centroid_hierarchy_helper(dc_tree, remaining_set_ordered, root))
+            root.set_right_tree(self.construct_centroid_hierarchy_helper(split_node[1], new_split_set_ordered, root))
 
             return root
 
@@ -743,7 +758,7 @@ class DCKCentroids(object):
             elif dc_tree.point_id == new_center:
                 return [[new_center, dc_tree]], False
             else:
-                return []
+                return [], False
         else:
             union_path = []
             for child in dc_tree.children:
@@ -756,10 +771,8 @@ class DCKCentroids(object):
                 return union_path, False
             if len(union_path) == 2:
                 if union_path[0][0] == new_center:
-                    union_path[0][1] = dc_tree
                     return union_path[0], True
                 else:
-                    union_path[1][1] = dc_tree
                     return union_path[1], True
             else:
                 return [], False
