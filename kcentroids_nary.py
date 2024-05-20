@@ -2,7 +2,7 @@ import efficientdcdist.dctree as dcdist
 import numpy as np
 import heapq
 import numba
-from n_density_tree import make_n_tree, prune_n_tree, get_leaves
+from n_density_tree import make_n_tree, prune_n_tree, get_leaves, NaryDensityTree
 from density_tree import DensityTree
 
 class DCKCentroids(object):
@@ -697,16 +697,118 @@ class DCKCentroids(object):
             cluster_centers.add(annotation[1])
             new_len = len(cluster_centers)
             if curr_len != new_len: #This janky setup is to make sure we do not need to use the "in" operation which has a worst-case O(n) complexity
-                annotation[2].chosen = True
+                annotation[2].chosen = True #This is in-place modifying the tree
                 annotation[2].best_center = annotation[1] 
                 cluster_order_centers.append(annotation[1])
         return cluster_order_centers
 
 
     # CLUSTER HIERARCHY OUTPUTTING
+    def center_order_list(self, annotations, k):
+        '''
+        Picks the set of centers a provided list of annotations. Will also add the cost decrease that was chosen for it. 
+        Returns the chosen centers as a list in the order they were picked.
+        '''
+        annotations.sort(reverse=True, key=lambda x : x[0]) #Sort by the first value of the tuples - the potential cost-decrease. Reverse=True to get descending order.
+
+        cluster_centers = set() #We should not use the "in" operation, as it is a worst-case O(n) operation. Just add again and again
+
+        cluster_order_centers = []
+
+        for annotation in annotations:
+            curr_len = len(cluster_centers)
+            if curr_len >= k:
+                break
+            cluster_centers.add(annotation[1])
+            new_len = len(cluster_centers)
+            if curr_len != new_len: #This janky setup is to make sure we do not need to use the "in" operation which has a worst-case O(n) complexity
+                cluster_order_centers.append((annotation[1], annotation[0]))
+        return cluster_order_centers
+
+    
+    
+    
+    def define_cluster_hierarchy_nary(self, points):
+        '''
+        O(n^2) implementation currently. 
+        Constructs the tree-hierarchy defined by the ordering of the n centers chosen.
+        The internal nodes have as their "dist" the center it corresponds to choosing by choosing that node. 
+        The leaves just have the node itself as point_id - this also implies that the center chosen to get that node is indeed that node.
 
 
-    def define_cluster_hierarchy(self, points):
+        Parameters
+        ----------
+        points : The set of points over which to create the hierarchy.
+        '''
+        n = points.shape[0]
+        placeholder = np.zeros(n)
+        dc_tree, _ = make_n_tree(points, placeholder, min_points=self.min_pts, )
+        annotations = self.annotate_tree(dc_tree) #Will use K-means or K-median loss depending on self.loss
+        center_list = self.center_order_list(annotations, n) #We need the full hierarchy, so choose k=n for amount of centers.
+        return self.construct_centroid_hierarchy_helper_nary(dc_tree, center_list)
+    
+    
+    
+    
+    
+    def construct_centroid_hierarchy_helper_nary(self, dc_tree, centers, parent=None):
+        '''
+        Tiebreaker is the current center that will take all the equidistant points in their cluster in next layer of recursion.
+        We already have the full set of points in "centers".
+        '''
+        if len(centers) == 1:
+            leaf = NaryDensityTree(0, parent, size=1)
+            leaf.point_id = centers[0]
+            return leaf
+        else:
+
+            root = NaryDensityTree(centers[0]+1 , parent, size=len(centers))
+            next_split = self.next_splitters(centers)
+            
+            split_node, _ = self.find_lca_set(dc_tree, centers[0], centers[1]) #centers[0] is the current center, centers[1] is the new center. 
+            new_split_set = set(get_leaves(split_node[1]))
+            remaining_set_ordered = [center for center in centers if center not in new_split_set] #We let remaining be left
+            new_split_set_ordered = [center for center in centers if center in new_split_set] #New is right. We use this instead of new_split_set, since we want to maintain the center choice ordering.
+            
+            root.set_left_tree(self.construct_centroid_hierarchy_helper(dc_tree, remaining_set_ordered, root))
+            root.set_right_tree(self.construct_centroid_hierarchy_helper(split_node[1], new_split_set_ordered, root))
+
+            return root
+
+    
+    def next_splitters(self, centers):
+        '''
+        We can only have one set of nodes with equidist, and then one node with next dist which will represent recursing into new depth on different dist.
+        The other splits can technically also have deeper recursion though, but their split height should crucially be equal.
+        '''
+        next_splitters = []
+        dists = []
+        seen_multiple_number = -1 #Keeps track of (if any) whether it's the first or second encountered cost that we see multiples of. This is used to make sure that we only do it for one of the two.
+        for center in centers:
+            if center[1] not in dists: #Adding new dist (the first seen of it)
+                if len(dists) == 2:
+                    return next_splitters
+                dists.append(center[1])
+                next_splitters.append(center[0])
+            else:
+                if len(dists) == 1 and seen_multiple_number == -1:
+                    seen_multiple_number = 1
+                    next_splitters.append(center[0])
+                elif len(dists) == 2 and seen_multiple_number == -1:
+                    seen_multiple_number = 2
+                    next_splitters.append(center[0])
+                elif len(dists) == 2 and seen_multiple_number == 1:
+                    return next_splitters
+                else:
+                    next_splitters.append(center[0])
+        return next_splitters
+
+    
+    
+    
+    #BINARY VERSION (THAT WORKS)
+    
+    def define_cluster_hierarchy_binary(self, points):
         '''
         O(n^2) implementation currently. 
         Constructs the tree-hierarchy defined by the ordering of the n centers chosen.
