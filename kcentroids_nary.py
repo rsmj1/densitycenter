@@ -707,7 +707,8 @@ class DCKCentroids(object):
     def center_order_list(self, annotations, k):
         '''
         Picks the set of centers a provided list of annotations. Will also add the cost decrease that was chosen for it. 
-        Returns the chosen centers as a list in the order they were picked.
+        Returns the chosen centers as a list in the order they were picked. 
+        The format is [(center_index_i, cost_decrease_i),(center_index_j, cost_decrease_j)]
         '''
         annotations.sort(reverse=True, key=lambda x : x[0]) #Sort by the first value of the tuples - the potential cost-decrease. Reverse=True to get descending order.
 
@@ -745,10 +746,8 @@ class DCKCentroids(object):
         dc_tree, _ = make_n_tree(points, placeholder, min_points=self.min_pts, )
         annotations = self.annotate_tree(dc_tree) #Will use K-means or K-median loss depending on self.loss
         center_list = self.center_order_list(annotations, n) #We need the full hierarchy, so choose k=n for amount of centers.
+        print("center list:", center_list)
         return self.construct_centroid_hierarchy_helper_nary(dc_tree, center_list)
-    
-    
-    
     
     
     def construct_centroid_hierarchy_helper_nary(self, dc_tree, centers, parent=None):
@@ -758,21 +757,27 @@ class DCKCentroids(object):
         '''
         if len(centers) == 1:
             leaf = NaryDensityTree(0, parent, size=1)
-            leaf.point_id = centers[0]
+            leaf.point_id = centers[0][0]
             return leaf
         else:
+            #root = NaryDensityTree(centers[0][0]+1 , parent, size=len(centers))
+            root = NaryDensityTree(centers[0][0]+1 , parent, size=len(centers))
 
-            root = NaryDensityTree(centers[0]+1 , parent, size=len(centers))
-            next_split = self.next_splitters(centers)
-            
-            split_node, _ = self.find_lca_set(dc_tree, centers[0], centers[1]) #centers[0] is the current center, centers[1] is the new center. 
-            new_split_set = set(get_leaves(split_node[1]))
-            remaining_set_ordered = [center for center in centers if center not in new_split_set] #We let remaining be left
-            new_split_set_ordered = [center for center in centers if center in new_split_set] #New is right. We use this instead of new_split_set, since we want to maintain the center choice ordering.
-            
-            root.set_left_tree(self.construct_centroid_hierarchy_helper(dc_tree, remaining_set_ordered, root))
-            root.set_right_tree(self.construct_centroid_hierarchy_helper(split_node[1], new_split_set_ordered, root))
+            next_split_set = self.next_splitters(centers)
+            total_split_set = {}
 
+            for splitter in next_split_set:
+                if centers[0][0] == splitter:
+                    continue
+                split_node, _ = self.find_lca_set(dc_tree, centers[0][0], splitter)
+                new_split_set = set(get_leaves(split_node[1]))
+                new_split_set_ordered = [center for center in centers if center[0] in new_split_set]
+                root.add_child(self.construct_centroid_hierarchy_helper_nary(split_node[1], new_split_set_ordered, root))
+                total_split_set.update(new_split_set_ordered)
+            
+            remaining_set_ordered = [center for center in centers if center[0] not in total_split_set] #We let remaining be left
+            if len(remaining_set_ordered) != 0:
+                root.add_child(self.construct_centroid_hierarchy_helper_nary(dc_tree, remaining_set_ordered, root))
             return root
 
     
@@ -853,6 +858,7 @@ class DCKCentroids(object):
     def find_lca_set(self, dc_tree, old_center, new_center):
         '''
         Finds the set of unique points for the new center, given the old center.
+        Returns the center and the corresponding dc-tree in a "pair" / list with two elements. Second element is the dc-tree.
         '''
         if dc_tree.is_leaf:
             if dc_tree.point_id == old_center:

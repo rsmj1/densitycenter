@@ -187,8 +187,9 @@ if __name__ == '__main__':
 
     kmedian_labels_nary = kmedian_nary.labels_
     kmedian_centers_nary = kmedian_nary.center_indexes
-
-    new_hierarchy = kmedian_nary.define_cluster_hierarchy(points)
+    new_hierarchy = kmedian_nary.define_cluster_hierarchy_nary(points)
+    plot_tree(new_hierarchy, is_binary=False)
+    new_hierarchy = kmedian_nary.define_cluster_hierarchy_binary(points)
     plot_tree(new_hierarchy, is_binary=True)
     #K-means clustering
     kmeans = DCKCentroids(k=k, min_pts=min_pts, loss="kmeans", noise_mode="none")
