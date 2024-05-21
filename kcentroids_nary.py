@@ -479,6 +479,7 @@ class DCKCentroids(object):
                 best_cost_decrease = loss(parent_dist) * tree.size - best_cost
                 array.append((best_cost_decrease, best_center, tree))
                 
+                tree.cost = best_cost #Currently here for testing.
                 return best_cost, best_center
             
                 
@@ -488,8 +489,7 @@ class DCKCentroids(object):
             annotation_builder(tree, output, np.inf, lambda x: x**2) #Using K-means loss
         return output
 
-    
-        
+
     def prune_annotations(self, annotations):
         '''
         This removes any centers that only have a path of length 1 before another center trumps it in cost-decrease.
@@ -747,10 +747,11 @@ class DCKCentroids(object):
         annotations = self.annotate_tree(dc_tree) #Will use K-means or K-median loss depending on self.loss
         center_list = self.center_order_list(annotations, n) #We need the full hierarchy, so choose k=n for amount of centers.
         print("center list:", center_list)
-        return self.construct_centroid_hierarchy_helper_nary(dc_tree, center_list)
+        cost = dc_tree.cost
+        return self.construct_centroid_hierarchy_helper_nary(dc_tree, center_list, cost)
     
     
-    def construct_centroid_hierarchy_helper_nary(self, dc_tree, centers, parent=None):
+    def construct_centroid_hierarchy_helper_nary(self, dc_tree, centers, cost, parent=None):
         '''
         Tiebreaker is the current center that will take all the equidistant points in their cluster in next layer of recursion.
         We already have the full set of points in "centers".
@@ -761,23 +762,25 @@ class DCKCentroids(object):
             return leaf
         else:
             #root = NaryDensityTree(centers[0][0]+1 , parent, size=len(centers))
-            root = NaryDensityTree(centers[0][0]+1 , parent, size=len(centers))
+            #print("cost:", cost)
+            root = NaryDensityTree(cost , parent, size=len(centers))
 
             next_split_set = self.next_splitters(centers)
             total_split_set = {}
-
+            total_cost_decrease = 0
             for splitter in next_split_set:
-                if centers[0][0] == splitter:
+                if centers[0][0] == splitter[0]:
                     continue
-                split_node, _ = self.find_lca_set(dc_tree, centers[0][0], splitter)
+                split_node, _ = self.find_lca_set(dc_tree, centers[0][0], splitter[0])
                 new_split_set = set(get_leaves(split_node[1]))
                 new_split_set_ordered = [center for center in centers if center[0] in new_split_set]
-                root.add_child(self.construct_centroid_hierarchy_helper_nary(split_node[1], new_split_set_ordered, root))
+                total_cost_decrease += splitter[1]
+                root.add_child(self.construct_centroid_hierarchy_helper_nary(split_node[1], new_split_set_ordered, splitter[1], root))
                 total_split_set.update(new_split_set_ordered)
             
             remaining_set_ordered = [center for center in centers if center[0] not in total_split_set] #We let remaining be left
             if len(remaining_set_ordered) != 0:
-                root.add_child(self.construct_centroid_hierarchy_helper_nary(dc_tree, remaining_set_ordered, root))
+                root.add_child(self.construct_centroid_hierarchy_helper_nary(dc_tree, remaining_set_ordered, cost, root))
             return root
 
     
@@ -794,24 +797,24 @@ class DCKCentroids(object):
                 if len(dists) == 2:
                     return next_splitters
                 dists.append(center[1])
-                next_splitters.append(center[0])
+                next_splitters.append(center)
             else:
                 if len(dists) == 1 and seen_multiple_number == -1:
                     seen_multiple_number = 1
-                    next_splitters.append(center[0])
+                    next_splitters.append(center)
                 elif len(dists) == 2 and seen_multiple_number == -1:
                     seen_multiple_number = 2
-                    next_splitters.append(center[0])
+                    next_splitters.append(center)
                 elif len(dists) == 2 and seen_multiple_number == 1:
                     return next_splitters
                 else:
-                    next_splitters.append(center[0])
+                    next_splitters.append(center)
         return next_splitters
 
     
     
     
-    #BINARY VERSION (THAT WORKS)
+    # OLD BINARY VERSION (THAT WORKS)
     
     def define_cluster_hierarchy_binary(self, points):
         '''

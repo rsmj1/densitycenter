@@ -156,7 +156,7 @@ if __name__ == '__main__':
     labels = np.array([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16])
     
     dataset_type = "con_circles" 
-    #points, labels = create_dataset(num_points=num_points, datatype=dataset_type, save=save_dataset, load=load_dataset, save_name=save_name, load_name=load_name)
+    points, labels = create_dataset(num_points=num_points, datatype=dataset_type, save=save_dataset, load=load_dataset, save_name=save_name, load_name=load_name)
 
 
 

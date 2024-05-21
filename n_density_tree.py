@@ -16,7 +16,7 @@ class NaryDensityTree:
 
         #For efficient greedy
         self.best_center = None
-        self.cost_decrease = None
+        self.cost = None
         self.chosen = False
 
         #For pruning
