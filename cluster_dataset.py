@@ -18,7 +18,7 @@ from n_density_tree import make_n_tree, prune_n_tree
 from tree_plotting import plot_embedding
 from cluster_tree import dc_clustering
 from point_gen import create_hierarchical_clusters
-from visualization import visualize, plot_tree
+from visualization import visualize, plot_tree, plot_tree_v2
 from benchmark import create_dataset
 from benchmark import normalize_cluster_ordering
 from cluster_tree import copy_tree, prune_tree
@@ -135,14 +135,14 @@ if __name__ == '__main__':
     labels = np.array([0,1,2,3,4,5,6,7,8,9,10,11])
 
     points = np.array([[1,2],
-                       [1,4],
+                       [1,3],
                        [2,3],
                        [7.5,-3], #5
-                       [41,41],
-                       [40,41],
-                       [40.5,40.5], 
-                       [30,30], 
-                       [15,18], #10
+                       [21,21],
+                       [20,21],
+                       [20.5,20.5], 
+                       [15,15], 
+                       [11,11], #10
                        ]
                        )
     labels = np.array([0,1,2,3,4,5,6,7,8])
@@ -184,7 +184,7 @@ if __name__ == '__main__':
 
 
 
-    visualize(points=points, cluster_labels=labels, minPts=min_pts, distance="mut_reach", centers=None, save=save_visualization, save_name=image_save_name)
+    #visualize(points=points, cluster_labels=labels, minPts=min_pts, distance="mut_reach", centers=None, save=save_visualization, save_name=image_save_name)
     
 
 
@@ -275,9 +275,10 @@ if __name__ == '__main__':
     if points.shape[0] < 100:
         #visualize(points=points, cluster_labels=hdb_labels, minPts=min_pts, distance="dc_dist", centers=centers, save=save_visualization, save_name=image_save_name)
         print("kmedian centers:", np.array(kmedian_nary.center_indexes)+1)
+        plot_tree_v2(n_root, labels=hdbscan_nary_labels)
         plot_tree(n_root, labels=hdbscan_nary_labels, centers=None, is_binary=False)
 
-        plot_tree(n_root, labels=hdbscan_nary_labels, centers = None, is_binary=False, extra_annotations=hdbscan_nary.extra_annotations)
+        #plot_tree(n_root, labels=hdbscan_nary_labels, centers = None, is_binary=False, extra_annotations=hdbscan_nary.extra_annotations)
 
         runtime_save(points, labels, load_dataset) #Enable this to have the option to save a dataset during runtime via the command line.
 
@@ -286,10 +287,19 @@ if __name__ == '__main__':
     plot_points = points
     plot_embedding(
         plot_points,
+        [hdbscan_nary_labels],
+        ['HDBSCAN nary'],
+        centers=centers,
+        dot_scale=4.5
+    )
+
+    plot_points = points
+    plot_embedding(
+        plot_points,
         [hdbscan_nary_labels         , hdb_labels],
         ['HDBSCAN nary', "HDBSCAN"],
         centers=centers,
-        dot_scale=1
+        dot_scale=3
     )
 
     plot_embedding(

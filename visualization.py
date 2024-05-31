@@ -343,7 +343,7 @@ def make_node_lists_nary(root, point_labels, parent_count, dist_list, edge_list,
                     edgecolor_list.append("yellow")
     else:
         color_list.append(-1)
-        alpha_list.append(0.5)
+        alpha_list.append(0)
         edgecolor_list.append("black")
 
     for tree in root.children:
@@ -470,7 +470,7 @@ def plot_tree(root, labels=None, centers=None, save=False, save_name=None, is_bi
       assert isinstance(root, DensityTree), "is_binary is True so expected a root of class DensityTree"
       make_node_lists(root, labels, 1, dist_list, edge_list, color_list, alpha_list, edgecolor_list, dist_dict, centers)
       pos_list = find_node_positions(root, 10)
-    else:   
+    else:
       assert isinstance(root, NaryDensityTree), "is_binary is False so expected a root of class NaryDensityTree"
       make_node_lists_nary(root, labels, 1, dist_list, edge_list, color_list, alpha_list, edgecolor_list, dist_dict, centers)
       pos_list = find_node_positions_nary(root, 10)
@@ -481,7 +481,7 @@ def plot_tree(root, labels=None, centers=None, save=False, save_name=None, is_bi
     if extra_annotations is not None and len(extra_annotations) != G.number_of_nodes():
       print("You should only use extra annotations with mcs <= 2!")
       raise AssertionError("Extra annotations are not compatible!")       
-
+    print("G.nodes:", G.nodes)
 
     extra_dict = {}
     pos_dict = {}
@@ -505,7 +505,131 @@ def plot_tree(root, labels=None, centers=None, save=False, save_name=None, is_bi
     else:
       plt.title("n-ary dc-distance tree with " + str(len(labels)) + " points")
     
-    nx.draw_networkx_nodes(G, pos=pos_dict, node_color=color_list, alpha=alpha_list, edgecolors=edgecolor_list, linewidths=1.5)
+    nx.draw_networkx_nodes(G, pos=pos_dict, node_color=color_list, alpha=alpha_list, edgecolors=edgecolor_list, linewidths=1.5, node_size=450)
+    nx.draw_networkx_edges(G, pos=pos_dict)
+    nx.draw_networkx_labels(G, pos=pos_dict, labels=dist_dict, font_size=8)
+    
+    if save:
+        if save_name is None:
+            save_name = str(datetime.now())
+        plt.savefig("savefiles/images/"+save_name+"_tree.png")
+
+    plt.show()
+
+
+def make_node_lists_nary_v2(root, point_labels, parent_count, dist_list, edge_list, color_list, alpha_list, edgecolor_list, dist_dict, centers=None):
+    count = parent_count
+    if root.dist > 0:
+        dist_list.append(root.dist)
+    else: 
+        dist_list.append(root.point_id+1)
+    if root.is_leaf and root.point_id is not None:
+        if root.point_id == -2:
+            color_list.append(0)
+        else:
+            color_list.append(point_labels[root.point_id])
+            alpha_list.append(1)
+            if centers is not None:
+                if root.point_id in centers:
+                    edgecolor_list.append("red")
+                elif point_labels[root.point_id] != -1:
+                    edgecolor_list.append("black")
+                else: 
+                    edgecolor_list.append("yellow")
+            else: 
+                if point_labels[root.point_id] != -1: #Non-noise points
+                    edgecolor_list.append("black")
+                else: #Noise points:
+                    edgecolor_list.append("yellow")
+    else: #Internal node
+        color_list.append("white")
+        alpha_list.append(1)
+        edgecolor_list.append("black")
+
+    for tree in root.children:
+        if tree is not None:
+            edge_list.append((parent_count, count+1))
+            count = make_node_lists_nary_v2(
+                tree,
+                point_labels,
+                count+1,
+                dist_list,
+                edge_list,
+                color_list,
+                alpha_list,
+                edgecolor_list,
+                dist_dict,
+                centers
+            )
+
+    return count
+
+def plot_tree_v2(root, labels=None, centers=None, save=False, save_name=None):
+    '''
+    Plots the dc-dist tree, optionally highligthing nodes chosen as centers with a red outline. Shows the node indexes on the leaves and dc-distances in the non-leaf nodes. The leaves are color-coded by the provided labels.
+    A yellow outline means that a node was labelled noise. 
+    Parameters
+    ----------
+    root : DensityTree
+    labels : Numpy.Array
+    centers : Numpy.Array, default=None
+    save : Boolean, default=False
+    save_name : String, default=None
+    extra_annotations, Numpy.Array, default=None
+      The annotations should be provided in preorder traversal order over the binary tree.
+    '''
+
+    if labels is None:
+       labels = np.arange(root.size)
+    dist_dict = {}
+
+    edge_list = []
+    dist_list = []
+    color_list = []
+    alpha_list = []
+    edgecolor_list = []
+
+    assert isinstance(root, NaryDensityTree), "is_binary is False so expected a root of class NaryDensityTree"
+    make_node_lists_nary_v2(root, labels, 1, dist_list, edge_list, color_list, alpha_list, edgecolor_list, dist_dict, centers)
+    pos_list = find_node_positions_nary(root, 10)
+
+    G = nx.Graph()
+    G.add_edges_from(edge_list)
+
+    pos_dict = {}
+    for i, node in enumerate(G.nodes):
+        pos_dict[node] = pos_list[i]
+        #+1 for {:.0f} as these are the node numbers which are 0 indexed from the point_ids in the tree, but are 1-indexed in the other visualizations.
+        dist_dict[node] = '{:.2f}'.format(dist_list[i]) if dist_list[i] % 1 != 0 else '{:.0f}'.format(dist_list[i])
+
+
+    plt.title("n-ary dc-distance tree with " + str(len(labels)) + " points")
+
+
+
+    # Identify internal nodes and leaf nodes
+    internal_nodes = [node for node in G.nodes() if G.degree(node) > 1]
+    leaf_nodes = [node for node in G.nodes() if G.degree(node) == 1]
+
+    # Split color, alpha, and edgecolor lists
+    internal_color_list = [color_list[node - 1] for node in internal_nodes]
+    leaf_color_list = [color_list[node - 1] for node in leaf_nodes]
+    print("internal colors:", internal_color_list)
+    print("leaf_color_list:", leaf_color_list)
+
+    internal_alpha_list = [alpha_list[node - 1] for node in internal_nodes]
+    leaf_alpha_list = [alpha_list[node - 1] for node in leaf_nodes]
+
+    internal_edgecolor_list = [edgecolor_list[node - 1] for node in internal_nodes]
+    leaf_edgecolor_list = [edgecolor_list[node - 1] for node in leaf_nodes]
+
+
+    # Draw internal nodes
+    nx.draw_networkx_nodes(G, pos=pos_dict, nodelist=internal_nodes, node_color=internal_color_list, alpha=internal_alpha_list, edgecolors=internal_edgecolor_list, linewidths=1.5, node_size=450)
+
+    # Draw leaf nodes
+    nx.draw_networkx_nodes(G, pos=pos_dict, nodelist=leaf_nodes, node_color=leaf_color_list, alpha=leaf_alpha_list, edgecolors=leaf_edgecolor_list, linewidths=1.5, node_size=450)
+    
     nx.draw_networkx_edges(G, pos=pos_dict)
     nx.draw_networkx_labels(G, pos=pos_dict, labels=dist_dict, font_size=8)
     
