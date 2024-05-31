@@ -746,8 +746,10 @@ class DCKCentroids(object):
         dc_tree, _ = make_n_tree(points, placeholder, min_points=self.min_pts, )
         annotations = self.annotate_tree(dc_tree) #Will use K-means or K-median loss depending on self.loss
         center_list = self.center_order_list(annotations, n) #We need the full hierarchy, so choose k=n for amount of centers.
-        print("center list:", center_list)
         cost = dc_tree.cost
+        print("cost:", cost)
+        self.cdists = self.get_cdists(points, self.min_pts)
+        print("cdist sum:", sum(self.cdists))
         return self.construct_centroid_hierarchy_helper_nary(dc_tree, center_list, cost)
     
     
@@ -761,9 +763,8 @@ class DCKCentroids(object):
             leaf.point_id = centers[0][0]
             return leaf
         else:
-            #root = NaryDensityTree(centers[0][0]+1 , parent, size=len(centers))
-            #print("cost:", cost)
-            root = NaryDensityTree(cost , parent, size=len(centers))
+            root = NaryDensityTree(centers[0][0]+1 , parent, size=len(centers))
+            #root = NaryDensityTree(cost , parent, size=len(centers))
 
             next_split_set = self.next_splitters(centers)
             total_split_set = {}

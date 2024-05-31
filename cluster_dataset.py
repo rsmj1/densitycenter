@@ -118,49 +118,73 @@ if __name__ == '__main__':
     labels = np.array([0,1,2,3,4,5,6,7,8,9,10,11])
 
     #Interesting example with min_pts = 3, mcs = 2 - shows a potential bug for sklearn HDBSCAN.
-    # points = np.array([[1,2],
-    #                    [1,4],
-    #                    [2,3],
-    #                    [1,1],
-    #                    [3.5,0.5], #5
-    #                    [7.5,-3],
-    #                    [40,40],
-    #                    [41,41],
-    #                    [40,41],
-    #                    [40.5,40.5], #10
-    #                    [30,30],
-    #                    [15,18],
-    #                    ]
-    #                    )
-    # labels = np.array([0,1,2,3,4,5,6,7,8,9,10,11])
-
     points = np.array([[1,2],
                        [1,4],
                        [2,3],
                        [1,1],
-                       [-5,15], #5
-                       [11,13],
-                       [13,11],
-                       [10,8],
-                       [14,13],
-                       [16,17], #10
-                       [18,19],
-                       [19,18],
-                       [21,24],
-                       [11,17],
-                       [28,21], #15
-                       [10,18],
-                       [7,7]
+                       [3.5,0.5], #5
+                       [7.5,-3],
+                       [40,40],
+                       [41,41],
+                       [40,41],
+                       [40.5,40.5], #10
+                       [30,30],
+                       [15,18],
                        ]
                        )
-    labels = np.array([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16])
+    labels = np.array([0,1,2,3,4,5,6,7,8,9,10,11])
+
+    points = np.array([[1,2],
+                       [1,4],
+                       [2,3],
+                       [7.5,-3], #5
+                       [41,41],
+                       [40,41],
+                       [40.5,40.5], 
+                       [30,30], 
+                       [15,18], #10
+                       ]
+                       )
+    labels = np.array([0,1,2,3,4,5,6,7,8])
+
+    # points = np.array([[1,2],
+    #                    [1,4],
+    #                    [2,3],
+    #                    [1,1],
+    #                    [-5,15], #5
+    #                    [11,13],
+    #                    [13,11],
+    #                    [10,8],
+    #                    [14,13],
+    #                    [16,17], #10
+    #                    [18,19],
+    #                    [19,18],
+    #                    [21,24],
+    #                    [11,17],
+    #                    [28,21], #15
+    #                    [10,18],
+    #                    [7,7]
+    #                    ]
+    #                    )
+    # labels = np.array([0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16])
     
+    # #Very simple example for visualizing example which also visualizes what happens when creating the n-ary dc-tree. 
+    # points = np.array([[2,3],
+    #                    [3,4],
+    #                    [5,3],
+    #                    [1,1],
+    #                    [2,2]
+    #                    ]
+    #                    )
+    # labels = np.array([0,1,2,3,4])
+
+
     dataset_type = "con_circles" 
-    points, labels = create_dataset(num_points=num_points, datatype=dataset_type, save=save_dataset, load=load_dataset, save_name=save_name, load_name=load_name)
+    #points, labels = create_dataset(num_points=num_points, datatype=dataset_type, save=save_dataset, load=load_dataset, save_name=save_name, load_name=load_name)
 
 
 
-    
+    visualize(points=points, cluster_labels=labels, minPts=min_pts, distance="mut_reach", centers=None, save=save_visualization, save_name=image_save_name)
     
 
 
@@ -170,6 +194,7 @@ if __name__ == '__main__':
     t2 = time.time()
     n_root,_ = make_n_tree(points, None, min_points=min_pts)
     t3 = time.time()
+    #plot_tree(root, labels)
 
     print("binary dctree time:", t2-t1)
 
@@ -188,9 +213,9 @@ if __name__ == '__main__':
     kmedian_labels_nary = kmedian_nary.labels_
     kmedian_centers_nary = kmedian_nary.center_indexes
     new_hierarchy = kmedian_nary.define_cluster_hierarchy_nary(points)
-    plot_tree(new_hierarchy, is_binary=False)
+    #plot_tree(new_hierarchy, is_binary=False)
     new_hierarchy = kmedian_nary.define_cluster_hierarchy_binary(points)
-    plot_tree(new_hierarchy, is_binary=True)
+    #plot_tree(new_hierarchy, is_binary=True)
     #K-means clustering
     kmeans = DCKCentroids(k=k, min_pts=min_pts, loss="kmeans", noise_mode="none")
     kmeans.fit(points)
@@ -250,8 +275,9 @@ if __name__ == '__main__':
     if points.shape[0] < 100:
         #visualize(points=points, cluster_labels=hdb_labels, minPts=min_pts, distance="dc_dist", centers=centers, save=save_visualization, save_name=image_save_name)
         print("kmedian centers:", np.array(kmedian_nary.center_indexes)+1)
+        plot_tree(n_root, labels=hdbscan_nary_labels, centers=None, is_binary=False)
 
-        plot_tree(n_root, labels=hdbscan_nary_labels, centers = kmedian_nary.center_indexes, is_binary=False, extra_annotations=hdbscan_nary.extra_annotations)
+        plot_tree(n_root, labels=hdbscan_nary_labels, centers = None, is_binary=False, extra_annotations=hdbscan_nary.extra_annotations)
 
         runtime_save(points, labels, load_dataset) #Enable this to have the option to save a dataset during runtime via the command line.
 

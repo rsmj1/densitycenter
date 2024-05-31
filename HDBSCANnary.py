@@ -116,8 +116,8 @@ class HDBSCAN(object):
         else:
             dc_tree = self.tree
 
-        #clusterings = self.compute_clustering(dc_tree, cdists)
-        clusterings = self.compute_clustering_general(dc_tree, cdists, self.cluster_stability_experimental)
+        clusterings = self.compute_clustering(dc_tree, cdists)
+        #clusterings = self.compute_clustering_general(dc_tree, cdists, self.cluster_stability_experimental) # This uses a general stability function
         labels = self.label_clusters(clusterings, n)
 
         self.labels_ = labels
