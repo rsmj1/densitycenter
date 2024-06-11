@@ -564,7 +564,7 @@ def make_node_lists_nary_v2(root, point_labels, parent_count, dist_list, edge_li
 
     return count
 
-def plot_tree_v2(root, labels=None, centers=None, save=False, save_name=None):
+def plot_tree_v2(root, labels=None, centers=None, save=False, save_name=None, extra_annotations=None, node_size=900):
     '''
     Plots the dc-dist tree, optionally highligthing nodes chosen as centers with a red outline. Shows the node indexes on the leaves and dc-distances in the non-leaf nodes. The leaves are color-coded by the provided labels.
     A yellow outline means that a node was labelled noise. 
@@ -595,13 +595,16 @@ def plot_tree_v2(root, labels=None, centers=None, save=False, save_name=None):
 
     G = nx.Graph()
     G.add_edges_from(edge_list)
-
+    
+    extra_dict = {}
     pos_dict = {}
     for i, node in enumerate(G.nodes):
         pos_dict[node] = pos_list[i]
         #+1 for {:.0f} as these are the node numbers which are 0 indexed from the point_ids in the tree, but are 1-indexed in the other visualizations.
-        dist_dict[node] = '{:.2f}'.format(dist_list[i]) if dist_list[i] % 1 != 0 else '{:.0f}'.format(dist_list[i])
+        dist_dict[node] = '{:.1f}'.format(dist_list[i]) if dist_list[i] % 1 != 0 else '{:.0f}'.format(dist_list[i])
 
+        if extra_annotations is not None: #Also for extra here
+          extra_dict[node] = np.round(extra_annotations[i],2) 
 
     plt.title("n-ary dc-distance tree with " + str(len(labels)) + " points")
 
@@ -614,8 +617,8 @@ def plot_tree_v2(root, labels=None, centers=None, save=False, save_name=None):
     # Split color, alpha, and edgecolor lists
     internal_color_list = [color_list[node - 1] for node in internal_nodes]
     leaf_color_list = [color_list[node - 1] for node in leaf_nodes]
-    print("internal colors:", internal_color_list)
-    print("leaf_color_list:", leaf_color_list)
+    #print("internal colors:", internal_color_list)
+    #print("leaf_color_list:", leaf_color_list)
 
     internal_alpha_list = [alpha_list[node - 1] for node in internal_nodes]
     leaf_alpha_list = [alpha_list[node - 1] for node in leaf_nodes]
@@ -624,15 +627,42 @@ def plot_tree_v2(root, labels=None, centers=None, save=False, save_name=None):
     leaf_edgecolor_list = [edgecolor_list[node - 1] for node in leaf_nodes]
 
 
-    # Draw internal nodes
-    nx.draw_networkx_nodes(G, pos=pos_dict, nodelist=internal_nodes, node_color=internal_color_list, alpha=internal_alpha_list, edgecolors=internal_edgecolor_list, linewidths=1.5, node_size=450)
+    noise_nodes = [node for node in G.nodes() if (G.degree(node) == 1 and color_list[node - 1] == -1)]
+    noise_color_list = ["lightgrey" for node in noise_nodes]
+    noise_alpha_list = [alpha_list[node - 1] for node in noise_nodes]
+    noise_edgecolor_list = ["lightgrey" for node in noise_nodes]
 
+
+    
+    # Draw internal nodes
+    nx.draw_networkx_nodes(G, pos=pos_dict, nodelist=internal_nodes, node_color=internal_color_list, alpha=internal_alpha_list, edgecolors=internal_edgecolor_list, linewidths=1.5, node_size=node_size)
+
+    cmap = "Paired"
     # Draw leaf nodes
-    nx.draw_networkx_nodes(G, pos=pos_dict, nodelist=leaf_nodes, node_color=leaf_color_list, alpha=leaf_alpha_list, edgecolors=leaf_edgecolor_list, linewidths=1.5, node_size=450)
+    nx.draw_networkx_nodes(G, pos=pos_dict, nodelist=leaf_nodes, node_color=leaf_color_list, alpha=leaf_alpha_list, edgecolors=leaf_edgecolor_list, linewidths=1.5, node_size=node_size, cmap=cmap)
     
+    # Draw noise nodes
+    if len(noise_nodes) != 0:
+      nx.draw_networkx_nodes(G, pos=pos_dict, nodelist=noise_nodes, node_color=noise_color_list, alpha=noise_alpha_list, edgecolors=noise_edgecolor_list, linewidths=1.5, node_size=node_size)
+
+
     nx.draw_networkx_edges(G, pos=pos_dict)
-    nx.draw_networkx_labels(G, pos=pos_dict, labels=dist_dict, font_size=8)
+    nx.draw_networkx_labels(G, pos=pos_dict, labels=dist_dict, font_size=max(6,int(node_size / 75)))
     
+
+    if extra_annotations is not None:
+      #New modification for optional annotations on the tree here.
+      for node, (x, y) in pos_dict.items():
+          #print("Node:", node)
+          #First two are the positions of the extra text, the third is the actual text to add.
+          val = 0
+          if extra_dict[node] != 0.0:
+             val = extra_dict[node]
+
+          plt.text(x, y + 0.05, val, horizontalalignment='center', fontsize=max(6,int(node_size / 75)), bbox=dict(facecolor='white', edgecolor='black', boxstyle='round,pad=0.2'))
+
+
+
     if save:
         if save_name is None:
             save_name = str(datetime.now())

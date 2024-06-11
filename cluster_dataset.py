@@ -63,19 +63,18 @@ def runtime_save(points, labels, load_dataset):
 if __name__ == '__main__': 
     #################### RUN PARAMETERS HERE #######################
 
-    num_points = 50
-    k = 8
-    min_pts = 3
-    mcs = 2
+    num_points = 200
+    k = 5
+    min_pts = 5
+    mcs = 5
 
     plot_tree_bool = False  
-    n_neighbors = 15
     eps = 2
     dataset_type = "circle" 
     save_dataset = False
     load_dataset = True #If true will override the other params and just load from the filename.
     save_name = "debugstability" #Shared for name of images, filename to save the dataset into
-    load_name = "meeting_example"
+    load_name = "badex1"
 
     #visualization parameters - comment in or out the visualization tools in the section below
     save_visualization = False
@@ -145,8 +144,7 @@ if __name__ == '__main__':
                        [11,11], #10
                        ]
                        )
-    labels = np.array([0,1,2,3,4,5,6,7,8])
-
+    labels = np.array(["lightgreen", "lightgreen", "lightgreen", "lightgreen", "lightgreen", "lightgreen", "lightgreen", "lightgreen", "lightgreen"])
     # points = np.array([[1,2],
     #                    [1,4],
     #                    [2,3],
@@ -178,10 +176,26 @@ if __name__ == '__main__':
     #                    )
     # labels = np.array([0,1,2,3,4])
 
+    points = np.array([[1,2],
+                       [1,3],
+                       [2,3],
+                       [3,4], 
+                       [7.5,-3], #5 
+                       [21,21],
+                       [20,21],
+                       [20.5,20.5],
+                       [19.5,19.5], 
+                       [15,15], #10
+                       [11,11], 
+                       ]
+                       )
+    labels = np.array(["lightgreen", "lightgreen", "lightgreen", "lightgreen", "lightgreen", "lightgreen", "lightgreen", "lightgreen", "lightgreen", "lightgreen", "lightgreen"])
 
-    dataset_type = "con_circles" 
-    #points, labels = create_dataset(num_points=num_points, datatype=dataset_type, save=save_dataset, load=load_dataset, save_name=save_name, load_name=load_name)
 
+
+    dataset_type = "blobs" 
+    points, labels = create_dataset(num_points=num_points, datatype=dataset_type, save=save_dataset, load=load_dataset, save_name=save_name, load_name=load_name, num_classes=k)
+    ##points, labels = points[:142], labels[:142]
 
 
     #visualize(points=points, cluster_labels=labels, minPts=min_pts, distance="mut_reach", centers=None, save=save_visualization, save_name=image_save_name)
@@ -212,35 +226,18 @@ if __name__ == '__main__':
 
     kmedian_labels_nary = kmedian_nary.labels_
     kmedian_centers_nary = kmedian_nary.center_indexes
-    new_hierarchy = kmedian_nary.define_cluster_hierarchy_nary(points)
+    #new_hierarchy = kmedian_nary.define_cluster_hierarchy_nary(points)
     #plot_tree(new_hierarchy, is_binary=False)
-    new_hierarchy = kmedian_nary.define_cluster_hierarchy_binary(points)
+    #new_hierarchy = kmedian_nary.define_cluster_hierarchy_binary(points)
     #plot_tree(new_hierarchy, is_binary=True)
     #K-means clustering
-    kmeans = DCKCentroids(k=k, min_pts=min_pts, loss="kmeans", noise_mode="none")
+    kmeans = DCKCentroids(k=k, min_pts=min_pts, loss="kmeans", noise_mode="medium")
     kmeans.fit(points)
 
     kmeans_labels = kmeans.labels_
     centers = kmeans.centers
     
 
-    #K-median clustering
-    kmedian = DCKCentroids(k=k, min_pts=min_pts, loss="kmedian", noise_mode="full")
-    kmedian.fit(points)
-
-    kmedian_labels = kmedian.labels_
-    kmedian_centers = kmedian.center_indexes
-
-
-    dbscan = DBSCAN(eps=eps, min_pts=min_pts)
-    dbscan.fit(points)
-    dbscan_labels = dbscan.labels_
-
-    #THIS CREATES ITS OWN TREE WITH ANOTHER STRUCTURE!!!
-    hdbscan_new = newScan(min_pts=min_pts, min_cluster_size=mcs, allow_single_cluster=True, tree=root)
-    hdbscan_new.fit(points)
-    hdb_new_labels = hdbscan_new.labels_
-    
 
     hdbscan_nary = HDBSCANnary(min_pts=min_pts, min_cluster_size=mcs, allow_single_cluster=False)
     hdbscan_nary.fit(points)
@@ -272,51 +269,42 @@ if __name__ == '__main__':
 
     ################################### RESULTS VISUALIZATION #####################################
     #Plot the complete graph from the dataset with the specified distance measure on all of the edges. Optionally show the distances in embedded space with MDS.
-    if points.shape[0] < 100:
-        #visualize(points=points, cluster_labels=hdb_labels, minPts=min_pts, distance="dc_dist", centers=centers, save=save_visualization, save_name=image_save_name)
-        print("kmedian centers:", np.array(kmedian_nary.center_indexes)+1)
-        plot_tree_v2(n_root, labels=hdbscan_nary_labels)
-        plot_tree(n_root, labels=hdbscan_nary_labels, centers=None, is_binary=False)
-
-        #plot_tree(n_root, labels=hdbscan_nary_labels, centers = None, is_binary=False, extra_annotations=hdbscan_nary.extra_annotations)
-
-        runtime_save(points, labels, load_dataset) #Enable this to have the option to save a dataset during runtime via the command line.
-
+    if points.shape[0] < 200:        
+        #plot_tree_v2(n_root, labels=labels)
+        plot_tree_v2(n_root, labels=hdb_labels, node_size=300)
+        
 
     #Plot the final clustering of the datapoints in 2D euclidean space.
     plot_points = points
+
+    # plot_embedding(
+    #     plot_points,
+    #     [labels],
+    #     ['Dataset with 11 points'],
+    #     centers=centers,
+    #     dot_scale=6
+    # )
+    nclusters = len(np.unique(hdbscan_nary_labels))-1 if -1 in hdbscan_nary_labels else len(np.unique(hdbscan_nary_labels))
     plot_embedding(
         plot_points,
         [hdbscan_nary_labels],
-        ['HDBSCAN nary'],
+        ['Dataset with ' + str(len(hdbscan_nary_labels)) + ' points and ' + str(nclusters) + " clusters"],
         centers=centers,
-        dot_scale=4.5
-    )
-
-    plot_points = points
-    plot_embedding(
-        plot_points,
-        [hdbscan_nary_labels         , hdb_labels],
-        ['HDBSCAN nary', "HDBSCAN"],
-        centers=centers,
-        dot_scale=3
+        dot_scale=2, #6 used for small dataset, 2 used for 400 points
+        annotations=False
     )
 
     plot_embedding(
         plot_points,
-        [kmedian_labels, kmeans_labels],
-        ['K-median' + k, "K-means" + k],
+        [hdbscan_nary_labels, hdb_labels],
+        ['Dataset with ' + str(len(hdbscan_nary_labels)) + ' points and ' + str(nclusters) + " clusters", "x"],
         centers=centers,
-        dot_scale=1
+        dot_scale=2, #6 used for small dataset, 2 used for 400 points
+        annotations=False
     )
 
-    plot_embedding(
-        plot_points,
-        [labels                            , pred_labels             , kmeans_labels , hdb_new_labels         , hdb_labels  , kmeans_labels_hk],
-        ['truth'+str(len(np.unique(labels))), 'k-Center on DC-dists'+k, 'K-means'+k   , '(new)HDBSCAN' + hk_new, "HDBSCAN"+hk, 'K-means'+ hk],
-        centers=centers,
-        dot_scale=0.5
-    )
+    runtime_save(points, labels, load_dataset) #Enable this to have the option to save a dataset during runtime via the command line.
+
 
 
 

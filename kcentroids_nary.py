@@ -61,8 +61,8 @@ class DCKCentroids(object):
 
         if self.noise_mode == "medium" or self.noise_mode == "full":
                 #This is to avoid picking noise points as centers
-                #annotations1 = self.prune_annotations_other(dc_tree, annotations) #This prunes based on the pruned tree. This is always slightly less aggressive than the one below. 
-                annotations = self.prune_annotations(annotations) #This prunes based on occurences in the annotation list.
+                annotations = self.prune_annotations_other(dc_tree, annotations) #This prunes based on the pruned tree. This is always slightly less aggressive than the one below. 
+                #annotations = self.prune_annotations(annotations) #This prunes based on occurences in the annotation list.
 
 
         #Now we just need to assign the points to the clusters.
@@ -527,7 +527,7 @@ class DCKCentroids(object):
         '''
         The annotations are built up as a list of [(cost-decrease, center, tree),...]
         '''
-        #points, _ = self.prune_cluster_subtree(tree, self.min_pts) #This is one option... however this will not prune below splits, which might not be ideal. 
+        points, _ = self.prune_cluster_subtree(tree, self.min_pts) #This is one option... however this will not prune below splits, which might not be ideal. 
         points = self.prune_cluster_subtree_aggressive(tree, self.min_pts)
         point_set = set(points)
         #print("point_set:", point_set)

@@ -83,7 +83,7 @@ def create_dataset(num_points, datatype, save=False, load=False, save_name=None,
     else: 
         ##### Synthetic datasets #####
 
-        if datatype == "moon":
+        if datatype == "moons":
             #Creates two half-moons in a "yin-yang" shape
             points, labels = make_moons(n_samples=num_points, noise=noise)
         elif datatype == "gauss":
@@ -100,7 +100,7 @@ def create_dataset(num_points, datatype, save=False, load=False, save_name=None,
             points, labels = make_circles_sklearn(n_samples=num_points, noise=noise)
         elif datatype == "blobs":
             #The cluster_std is the density of each blob essentially.
-            points, labels = make_blobs(n_samples=num_points, centers=5, cluster_std=[1.0, 2.0, 3.0, 4.0, 2.5])
+            points, labels = make_blobs(n_samples=num_points, centers=5, cluster_std=[2.0, 1.0, 1.0, 1.5, 1.5])
         elif datatype == "gauss_quantiles":
             points, labels = make_gaussian_quantiles(n_samples=num_points, n_features=num_features, n_classes=num_classes, cov=2.0)
         elif datatype == "classification":
@@ -110,7 +110,7 @@ def create_dataset(num_points, datatype, save=False, load=False, save_name=None,
             #A regression problem, similar thought process to classification above.
             points, labels = make_regression(n_samples=num_points, n_features=num_features, n_informative=num_features//2, n_classes=num_classes)
 
-        # More than 2 features: Not for plotting.
+        # More than 2 features: Not for plotting. Synthetic 
         elif datatype == "swiss_rolls":
             #Literally creates a "roll" of the points in 3d - 3 features for each point.
             points, labels = make_swiss_roll(n_samples=num_points, noise=noise)
@@ -127,7 +127,6 @@ def create_dataset(num_points, datatype, save=False, load=False, save_name=None,
         
         #Datasets from https://cs.joensuu.fi/sipu/datasets/ These are also 2d.
         elif datatype == "compound":
-
             points, labels = load_txt_datasets("compound")
         elif datatype == "worms":
             points, _ = load_txt_datasets("worms_2d")
@@ -136,8 +135,14 @@ def create_dataset(num_points, datatype, save=False, load=False, save_name=None,
             labels = euclid_kmeans.labels_
 
         elif datatype == "aggregate":
-            points, labels = load_txt_datasets("aggregate")
-                
+            points, labels = load_txt_datasets("Aggregation")
+        elif datatype == "d31":
+            points, labels = load_txt_datasets("d31")
+        elif datatype == "overlap":
+            points, labels = load_txt_datasets("overlap")
+            points = np.unique(points, axis=0)
+            labels = np.zeros(len(points))
+
         ##### Toy datasets #####
         elif datatype == "synth":
             points, labels = get_dataset('synth', num_classes=num_classes, points_per_class=(num_points//num_classes))
@@ -180,7 +185,8 @@ def load_txt_datasets(dataset="compound"):
                 labels.append(int(dims[2]))
             else:
                 points.append(list(map(float, dims)))
-
+    if len(labels) != len(points):
+        labels = np.zeros(len(points))
     return np.array(points), np.array(labels)
 
 def normalize_cluster_ordering(cluster_labels):
@@ -215,6 +221,7 @@ def normalize_cluster_ordering(cluster_labels):
 
 def equate_noise(noise_labels, noisee_labels):
     '''
+    Takes a set, noise labels, and overlays that noise in another set, noisee labels. 
     Makes the noise points in noise labels into noise points in noisee labels
     '''
     if noise_labels.shape[0] != noisee_labels.shape[0]:
@@ -293,7 +300,7 @@ def brute_force_comparision(num_points, min_pts, max_iters=100):
 
     return
 
-def benchmark(dataset_types, num_points, num_runs, runtypes, k, min_pts, eps, metrics=["nmi"],visualize_results=False, save_results=False, save_name="test", plot_clusterings = False):
+def benchmark(dataset_types, num_points, num_runs, runtypes, k, min_pts, eps, metrics=["nmi"],visualize_results=False, save_results=False, save_name="test", plot_clusterings = False, combine_results=False):
     '''
     Runs a set of algorithms "runtypes" on a set of datasets "dataset_types" with "num_runs" iterations on each dataset. 
     Within an iteration i of num_runs, will use the k (number of clusters) output from DBSCAN or HDBSCAN on algorithms that come after it.
@@ -340,6 +347,9 @@ def benchmark(dataset_types, num_points, num_runs, runtypes, k, min_pts, eps, me
     
     plot_clusterings : Boolean, default=False
         Whether to plot the clusterings for each dataset or not. TODO
+        
+    combine_results: Boolean, default=False
+        This is used to average over all the provided datasets instead of number of runs for each dataset.
     '''
     num_runtypes = len(runtypes)
     num_datasets = len(dataset_types)
@@ -351,11 +361,18 @@ def benchmark(dataset_types, num_points, num_runs, runtypes, k, min_pts, eps, me
     benchmark_results = np.zeros((num_runtypes+1, num_runtypes+1, num_datasets*num_metrics)) # Make square matrix with each layer being a separate dataset it has been run on. +1 for ground truth
     headers = np.empty((num_runtypes+1, num_datasets*num_metrics), dtype=np.dtype('U100'))
     rundata = []
+    
+    
+    benchmark_results_2 = np.zeros((num_runtypes, num_datasets, num_metrics))
+
+
+    
     #TODO: add possibility to use plot_embedding that will pop up each time a set of runs has finished to visually compare clusterings.
     #TODO: add control over seeding for reproducibility 
     for d, dataset_type in enumerate(dataset_types):
         comparison_matrix = np.zeros((num_runtypes+1, num_runtypes+1, num_runs, num_metrics)) #A num_runs layer 2d matrix for each metric
 
+        comparison_column = np.zeros((1, num_runtypes, num_runs, num_metrics))
         for i in range(num_runs):
             curr_k = k #Reset k between each run
             points, ground_truths = create_dataset(num_points, dataset_type) #Move this outside num_runs if should be same across runs
@@ -391,7 +408,10 @@ def benchmark(dataset_types, num_points, num_runs, runtypes, k, min_pts, eps, me
             plot_cluster_details.append("Ground Truth k"+str(len(np.unique(ground_truths))))
             #Do comparison between the different algorithms TODO: Should run this for each metric
             for m, metric in enumerate(metrics):          
-                comparison_matrix[:,:,i, m] = metric_matrix(curr_labels, metric)
+                comparison_matrix[:,:,i,m] = metric_matrix(curr_labels, metric)
+                
+                comparison_column[0,:,i,m] = metric_column(ground_truths, curr_labels[:-1], metric)
+                
 
             if plot_clusterings:
                 #TODO: Make it possible to give a plot_embedding header
@@ -401,9 +421,14 @@ def benchmark(dataset_types, num_points, num_runs, runtypes, k, min_pts, eps, me
             
         for m, metric in enumerate(metrics):
             averaged_comparisons = np.mean(comparison_matrix[:,:,:,m], axis=2)
-            benchmark_results[:,:,d*num_metrics+m] = averaged_comparisons #Insert the averaged values into the benchmark results #TODO WRONG
+            benchmark_results[:,:,d*num_metrics+m] = averaged_comparisons #Insert the averaged values into the benchmark results
             #Create metadata header for each matrix
             rundata.append("d:" + dataset_type + ",p:"+ str(num_points) + ",r:"+ str(num_runs)+ ",m:"+ metric)
+            averaged_column_comparisons = np.mean(comparison_column[:,:,:,m], axis=2)
+            print("avg comps:", averaged_column_comparisons)
+            
+            benchmark_results_2[:, d, m] = averaged_column_comparisons[0]
+
 
     if save_results:
         results_to_csv(benchmark_results, headers, rundata, save_name)
@@ -436,8 +461,7 @@ def display_results(results, headers, rundata, dataset_types, metrics):
     '''
     num_datasets = len(dataset_types)
     num_metrics = len(metrics)
-    fig, axes = plt.subplots(num_datasets, num_metrics)
-
+    fig, axes = plt.subplots(num_datasets, num_metrics, squeeze=False)
     for d in range(num_datasets):
         for m in range(num_metrics):
             ax = axes[d,m]
@@ -493,6 +517,20 @@ def metric_matrix(label_results, metric="nmi"):
             #Currently should probably just be NMI: It is symmetric. 
     return comparison_matrix
 
+def metric_column(ground_truth, label_results, metric="ari"):
+    n = label_results.shape[0]
+    comparison_column = np.zeros((1,n))
+    for i, labels1 in enumerate(label_results):
+        if metric == "nmi": #Normalized mutual information
+            comparison_column[0,i] = nmi(ground_truth, labels1)
+        elif metric == "ari": # Adjusted rand index
+            comparison_column[0,i] = ari(ground_truth, labels1)
+        elif metric == "ami":
+            comparison_column[0,i] = ami(ground_truth, labels1)
+        elif metric == "test":
+            comparison_column[0,i] = 100
+            #Currently should probably just be NMI: It is symmetric. 
+    return comparison_column
 
 def benchmark_single(points, runtype, k, min_pts, eps):
     '''
@@ -510,9 +548,9 @@ def benchmark_single(points, runtype, k, min_pts, eps):
             k -= 1
         used_min_pts = min_pts
     elif runtype == "HDBSCAN_NEW":
-        hdbscan_new = HDBSCANNary(min_samples = min_pts, min_cluster_size=2)
+        hdbscan_new = HDBSCANNary(min_pts = min_pts, min_cluster_size=2)
         hdbscan_new.fit(points)
-        labels = hdbscan.labels_
+        labels = hdbscan_new.labels_
         k = len(np.unique(labels))
         if np.isin(-1, labels) and k != 1: #Should not count noise labels as a set of labels
             k -= 1
@@ -563,6 +601,22 @@ def benchmark_single(points, runtype, k, min_pts, eps):
         labels = dckmeans.labels_
         used_min_pts = min_pts
 
+    elif runtype == "HDBSCAN_o1":
+        hdbscan_new = HDBSCANNary(min_pts = min_pts, min_cluster_size=2)
+        hdbscan_new.fit(points, objective="simple")
+        labels = hdbscan_new.labels_
+        k = len(np.unique(labels))
+        if np.isin(-1, labels) and k != 1: #Should not count noise labels as a set of labels
+            k -= 1
+        used_min_pts = min_pts
+    elif runtype == "HDBSCAN_o2":
+        hdbscan_new = HDBSCANNary(min_pts = min_pts, min_cluster_size=2)
+        hdbscan_new.fit(points, objective="simple2")
+        labels = hdbscan_new.labels_
+        k = len(np.unique(labels))
+        if np.isin(-1, labels) and k != 1: #Should not count noise labels as a set of labels
+            k -= 1
+        used_min_pts = min_pts
     else:
         raise AssertionError("runtype", runtype, "does not exist...")
     return labels, k, used_min_pts, used_eps
@@ -570,9 +624,9 @@ def benchmark_single(points, runtype, k, min_pts, eps):
 
 if __name__ == "__main__":
     #brute_force_comparision(num_points=10, min_pts=3)
-    points, labels = create_dataset(100, "coil")
-    print("points:", points[:100])
-    print("labels:", labels[:100])
-    #benchmark(dataset_types=["moon", "gauss", "circle"], num_points=500, num_runs=3, runtypes=["KMEANS","DCKMEANS", "HDBSCAN", "DCKMEANS"], metrics=["nmi", "test"], k=3, min_pts=3, eps=2, save_results=True, visualize_results=True, plot_clusterings=True)
+    # points, labels = create_dataset(100, "coil")
+    # print("points:", points[:100])
+    # print("labels:", labels[:100])
+    benchmark(dataset_types=["moons", "blobs"], num_points=100, num_runs=3, runtypes=["HDBSCAN", "HDBSCAN_o1", "HDBSCAN_o2"], metrics=["ari"], k=3, min_pts=5, eps=2, save_results=False, visualize_results=True, plot_clusterings=False)
 
 

@@ -97,7 +97,7 @@ class HDBSCAN(object):
         return D
     
 
-    def fit(self, points):
+    def fit(self, points, objective=None):
         '''
         1. Compute the core distances for each point
         2. Compute the dendrogram structure, which is equivalent to the dc_tree structure and contains the same information when combined with the core distances
@@ -115,9 +115,16 @@ class HDBSCAN(object):
             dc_tree,_ = make_n_tree(points, placeholder, self.min_pts, )
         else:
             dc_tree = self.tree
+        if objective is None:
+            clusterings = self.compute_clustering(dc_tree, cdists)
+        else:
+            if objective == "simple":
+                clusterings = self.compute_clustering_general(dc_tree, cdists, self.cluster_stability_experimental) # This uses a general stability function
+            elif objective == "simple2":
+                clusterings = self.compute_clustering_general(dc_tree, cdists, self.cluster_stability_experimental2) # This uses a general stability function
+            else:
+                clusterings = self.compute_clustering(dc_tree, cdists)
 
-        clusterings = self.compute_clustering(dc_tree, cdists)
-        #clusterings = self.compute_clustering_general(dc_tree, cdists, self.cluster_stability_experimental) # This uses a general stability function
         labels = self.label_clusters(clusterings, n)
 
         self.labels_ = labels
@@ -139,16 +146,20 @@ class HDBSCAN(object):
         '''
         if self.min_cluster_size > dc_tree.size:
             #Temp code for stability annotations:
-            stab = self.cluster_stability_experimental(dc_tree, cdists)
-            self.extra_annotations.append(stab)
+            stab = self.cluster_stability(dc_tree, dc_tree.parent.dist, dc_tree.size, cdists)
+            self.extra_annotations.append(dc_tree.size)
 
 
             #print("leaf, returning noise", self.get_leaves(dc_tree)+1)
             return [], 0 #Noise
         else:
             #Temp code for stability annotations:
-            stab = self.cluster_stability_experimental(dc_tree, cdists)
-            self.extra_annotations.append(stab)
+            if dc_tree.parent is not None:
+                stab = self.cluster_stability(dc_tree, dc_tree.parent.dist, dc_tree.size, cdists)
+                self.extra_annotations.append(dc_tree.size)
+            else:
+                stab = np.infty
+                self.extra_annotations.append(dc_tree.size)
 
             #Real code from here and below
             total_stability = 0
@@ -221,8 +232,10 @@ class HDBSCAN(object):
         Stop the recursion when two clusters merge and return that level value for all nodes below.
         
         '''
+
         emax = tree_size/parent_dist
         eminsum = self.sub_contribution(dc_tree, cdists)
+
         return eminsum - emax
     
     def sub_contribution(self, dc_tree, cdists):
@@ -235,7 +248,7 @@ class HDBSCAN(object):
                 stability = (1/cdists[dc_tree.point_id])
                 return stability
             else:
-                return 0
+                return 1/dc_tree.parent.dist
         split_size = self.split_size(dc_tree, self.min_cluster_size)
         if split_size >= 2:
             return dc_tree.size /dc_tree.dist
@@ -273,10 +286,6 @@ class HDBSCAN(object):
 
     def cluster_stability_experimental(self, tree, cdists):
         '''
-        The overall idea is essentially:
-        |dens(i) - dens(j)| / |i-j| 
-
-
         I currently have three ingredients:
         1. Weight(C) = sum(1/cdist(p) forall p in C)
         2. Var(C) = sum((Bar(C) - d(p,q))^2 forall p,q in C)
@@ -289,33 +298,48 @@ class HDBSCAN(object):
 
         Writing it out we get:
         sum( (1/C_min - 1/C_max) / (cd(p) * Var(C)) for all p in C )
-        
-        We need a plus factor below to account for the fact that the variance can be zero
-        Note that the variance is based on the distances rather than 1/dist, which then makes sense when you write it out.
-
     
         Another overall idea is that we compute the stability at the top of the cluster and select the overall clustering areas by this. 
         We can then choose within it based on something a bit more simple. Then the inter-cluster comparisons stay consistent and we can prune intra afterwards. 
-
         However, we still inherit weaknesses of the normal stability in doing so - we might have clusters with very high stability and persistence, where the
         '''
+        nodes = get_leaves(tree)
 
-        var,bar,dsize = self.cluster_statistics(tree)
+        dist = tree.dist if  tree.dist != 0 else cdists[tree.point_id]
+        pdist = tree.parent.dist if tree.parent is not None else np.inf
+
+
+        simple_stability = pdist - dist
+        return simple_stability
+
+    def cluster_stability_experimental2(self, tree, cdists):
+        '''
+        I currently have three ingredients:
+        1. Weight(C) = sum(1/cdist(p) forall p in C)
+        2. Var(C) = sum((Bar(C) - d(p,q))^2 forall p,q in C)
+            This can be interpreted as a compactness measure of the cluster. It is not exactly due to the nature of the dc-dist.
+        3. Per(C) = 1/C_min - 1/C_max
+
+        Giving us:
+
+        (Weight(C) * Per(C)) / Var(C)
+
+        Writing it out we get:
+        sum( (1/C_min - 1/C_max) / (cd(p) * Var(C)) for all p in C )
+    
+        Another overall idea is that we compute the stability at the top of the cluster and select the overall clustering areas by this. 
+        We can then choose within it based on something a bit more simple. Then the inter-cluster comparisons stay consistent and we can prune intra afterwards. 
+        However, we still inherit weaknesses of the normal stability in doing so - we might have clusters with very high stability and persistence, where the
+        '''
         nodes = get_leaves(tree)
         weight = np.sum(1/cdists[nodes])  
 
         dist = tree.dist if  tree.dist != 0 else cdists[tree.point_id]
         pdist = tree.parent.dist if tree.parent is not None else np.inf
-        persistence = 1/dist - 1/pdist
         percentage_persistence = (pdist-dist) / dist
-        max_cdist = max(cdists[nodes])
-        stability = (weight*percentage_persistence) / (var)
 
-        simple_stability = weight*percentage_persistence
-
-        return simple_stability
-
-
+        simple_stability2 = weight*percentage_persistence
+        return simple_stability2
 
 
     def cluster_statistics(self, dc_tree):
