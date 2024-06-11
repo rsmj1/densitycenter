@@ -433,6 +433,7 @@ def benchmark(dataset_types, num_points, num_runs, runtypes, k, min_pts, eps, me
     if save_results:
         results_to_csv(benchmark_results, headers, rundata, save_name)
     if visualize_results:
+        display_results_2(benchmark_results_2, runtypes, dataset_types, metrics)
         display_results(benchmark_results, headers, rundata, dataset_types, metrics) #Should get as input the actual datasets to display the clusterings
     return
 
@@ -484,6 +485,39 @@ def display_results(results, headers, rundata, dataset_types, metrics):
     plt.tight_layout()
     plt.show()
     return
+
+
+def display_results_2(results, runtypes, dataset_types, metrics):
+    '''
+    Displays cluster metrics compared to ground truth in heatmap grid. 
+    One big heatmap per metric.
+
+    '''
+    num_metrics = len(metrics)
+    fig, axes = plt.subplots(num_metrics)
+    axes = np.atleast_1d(axes)  # Ensure axes is always treated as an array
+
+    for m in range(num_metrics):
+        ax = axes[m]
+        curr_map = results[:,:,m]
+        im = ax.imshow(curr_map, cmap='viridis', interpolation=None)
+        ax.set_title(metrics[m])
+        print("shapes", results.shape[0], results.shape[1])
+        ax.set_yticks(range(results.shape[0]))
+        ax.set_xticks(range(results.shape[1]))
+        ax.set_yticklabels(runtypes)
+        ax.set_xticklabels(dataset_types)
+        fig.colorbar(im, ax=ax)
+
+        for (j,i),label in np.ndenumerate(curr_map):
+            ax.text(i,j,np.round(label, 2),ha='center',va='center', fontsize='small')
+
+
+
+    plt.tight_layout()
+    plt.show()
+    return
+
 
 
 def metric_matrix(label_results, metric="nmi"):
