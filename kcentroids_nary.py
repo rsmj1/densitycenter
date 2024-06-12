@@ -531,7 +531,6 @@ class DCKCentroids(object):
         '''
         #points, _ = self.prune_cluster_subtree(tree, self.min_pts) #This is one option... however this will not prune below splits, which might not be ideal. 
         points, _ = self.prune_cluster_subtree_aggressive(tree, self.min_pts)
-        print("points:", points)
         point_set = set(points)
         #print("point_set:", point_set)
         pruned_annotations = []

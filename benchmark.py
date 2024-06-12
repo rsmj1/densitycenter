@@ -580,8 +580,8 @@ def metric_matrix(label_results, metric="nmi"):
 def metric_column(ground_truth, label_results, metric="ari"):
     n = label_results.shape[0]
     comparison_column = np.zeros((1,n))
-    print("ground truth:", ground_truth)
-    print("label_results", label_results)
+    #print("ground truth:", ground_truth)
+    #print("label_results", label_results)
     for i, labels1 in enumerate(label_results):
         if metric == "nmi": #Normalized mutual information
             comparison_column[0,i] = nmi(ground_truth, labels1)
@@ -631,7 +631,7 @@ def benchmark_single(points, runtype, k, min_pts, eps, mcs, gtk):
         n = points.shape[0]
         placeholder = np.zeros(n)
         root, dc_dists = make_tree(points, placeholder, min_points=min_pts)
-        labels = dc_clustering(root, len(points), k=k, min_points=min_pts, with_noise=False)
+        labels = dc_clustering(root, len(points), k=k, min_points=min_pts, with_noise=False)[0]
     
     elif runtype == "KMEANS": #SKLEARN Kmeans
         kmeans = KMeans(n_clusters=gtk, n_init="auto")
@@ -681,9 +681,9 @@ def benchmark_single(points, runtype, k, min_pts, eps, mcs, gtk):
         costs = dckmeans.cost_decreases
         costs = costs[1:] #Remove the first np.inf
         k_values = list(range(2, len(costs) + 2))  # Assuming k starts at 2 and increments by 1
-        print("costs:", costs)
+        #print("costs:", costs)
         kn = KneeLocator(k_values, costs, curve='convex', direction='decreasing')
-        print("chosen k:", kn.knee)
+        #print("chosen k:", kn.knee)
         elbow_k = kn.knee
         dckmeans_elbow = DCKCentroidsNary(k=elbow_k, min_pts=min_pts, loss="kmeans", noise_mode="none")
         dckmeans_elbow.fit(points)
@@ -762,7 +762,7 @@ if __name__ == "__main__":
     runtypes2 = ["KMEANS", "KMEDOIDS", "DCKMEDIAN_GTK", "DCKMEANS_GTK","DCKMEDIAN_GTK10", "DCKMEANS_GTK10"]
 
 
-    benchmark2d = ["testing","compound", "pathbased", "aggregate", "d31", "jain",  "spiral"]
+    benchmark2d = ["compound", "pathbased", "aggregate", "d31", "jain",  "spiral"]
     synth2d = ["blobs", "blobs2", "quantiles", "moons", "TODO" ]
 
     benchmark10d = ["coil", ]
@@ -772,7 +772,7 @@ if __name__ == "__main__":
 
 
     #benchmark2d - remember to set to use optimal k
-    benchmark(dataset_types=benchmark2d, num_points=1000, num_runs=1, runtypes=runtypes, metrics=["ari"], k=5, min_pts=3, mcs=5, eps=2, num_features=2, save_results=False, visualize_results=True, plot_clusterings=False)
+    benchmark(dataset_types=benchmark2d, num_points=1000, num_runs=1, runtypes=runtypes, metrics=["ari"], k=5, min_pts=5, mcs=5, eps=2, num_features=2, save_results=False, visualize_results=True, plot_clusterings=False)
 
     #synth2d
     benchmark(dataset_types=synth2d, num_points=1000, num_runs=3, runtypes=runtypes, metrics=["ari"], k=3, min_pts=5, mcs=5, eps=2, num_features=2, save_results=False, visualize_results=True, plot_clusterings=False)
