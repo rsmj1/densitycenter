@@ -100,7 +100,10 @@ def create_dataset(num_points, datatype, save=False, load=False, save_name=None,
             points, labels = make_circles_sklearn(n_samples=num_points, noise=noise)
         elif datatype == "blobs":
             #The cluster_std is the density of each blob essentially.
-            points, labels = make_blobs(n_samples=num_points, centers=5, cluster_std=[2.0, 1.0, 1.0, 1.5, 1.5])
+            points, labels = make_blobs(n_samples=num_points, centers=10, n_features=num_features, random_state=1)
+        elif datatype == "blobs2":
+            cluster_numbers_blobs_unbalanced = [92, 157, 91, 133, 53, 70, 139, 74, 80, 111] #1000 in total
+            points, labels = make_blobs(n_samples=cluster_numbers_blobs_unbalanced, centers=None, n_features=num_features, random_state=1)
         elif datatype == "gauss_quantiles":
             points, labels = make_gaussian_quantiles(n_samples=num_points, n_features=num_features, n_classes=num_classes, cov=2.0)
         elif datatype == "classification":
@@ -128,20 +131,25 @@ def create_dataset(num_points, datatype, save=False, load=False, save_name=None,
         #Datasets from https://cs.joensuu.fi/sipu/datasets/ These are also 2d.
         elif datatype == "compound":
             points, labels = load_txt_datasets("compound")
-        elif datatype == "worms":
+        elif datatype == "worms": #No labels!!
             points, _ = load_txt_datasets("worms_2d")
             euclid_kmeans = KMeans(n_clusters=k)
             euclid_kmeans.fit(points)
             labels = euclid_kmeans.labels_
-
         elif datatype == "aggregate":
             points, labels = load_txt_datasets("Aggregation")
         elif datatype == "d31":
             points, labels = load_txt_datasets("d31")
-        elif datatype == "overlap":
+        elif datatype == "overlap": #No labels!!
             points, labels = load_txt_datasets("overlap")
             points = np.unique(points, axis=0)
             labels = np.zeros(len(points))
+        elif datatype == "jain":
+            points, labels = load_txt_datasets("jain")
+        elif datatype == "pathbased":
+            points, labels = load_txt_datasets("pathbased")
+        elif datatype == "spiral":
+            points, labels = load_txt_datasets("spiral")
 
         ##### Toy datasets #####
         elif datatype == "synth":
@@ -300,7 +308,7 @@ def brute_force_comparision(num_points, min_pts, max_iters=100):
 
     return
 
-def benchmark(dataset_types, num_points, num_runs, runtypes, k, min_pts, eps, metrics=["nmi"],visualize_results=False, save_results=False, save_name="test", plot_clusterings = False, combine_results=False):
+def benchmark(dataset_types, num_points, num_runs, runtypes, k, min_pts, eps, mcs=None, num_features=None, metrics=["nmi"],visualize_results=False, save_results=False, save_name="test", plot_clusterings = False, combine_results=False):
     '''
     Runs a set of algorithms "runtypes" on a set of datasets "dataset_types" with "num_runs" iterations on each dataset. 
     Within an iteration i of num_runs, will use the k (number of clusters) output from DBSCAN or HDBSCAN on algorithms that come after it.
@@ -365,8 +373,11 @@ def benchmark(dataset_types, num_points, num_runs, runtypes, k, min_pts, eps, me
     
     benchmark_results_2 = np.zeros((num_runtypes, num_datasets, num_metrics))
 
+    if mcs is None:
+        mcs = 2
+    if num_features is None:
+        num_features = 2
 
-    
     #TODO: add possibility to use plot_embedding that will pop up each time a set of runs has finished to visually compare clusterings.
     #TODO: add control over seeding for reproducibility 
     for d, dataset_type in enumerate(dataset_types):
@@ -375,7 +386,7 @@ def benchmark(dataset_types, num_points, num_runs, runtypes, k, min_pts, eps, me
         comparison_column = np.zeros((1, num_runtypes, num_runs, num_metrics))
         for i in range(num_runs):
             curr_k = k #Reset k between each run
-            points, ground_truths = create_dataset(num_points, dataset_type) #Move this outside num_runs if should be same across runs
+            points, ground_truths = create_dataset(num_points, dataset_type, num_features=num_features) #Move this outside num_runs if should be same across runs
             datasets.append(points) #Save the points generated for visualization later
             n = points.shape[0]
 
@@ -387,7 +398,7 @@ def benchmark(dataset_types, num_points, num_runs, runtypes, k, min_pts, eps, me
             for r, runtype in enumerate(runtypes):
                 if runtype == "HDBSCAN" or runtype == "DBSCAN" or runtype == "HDBSCAN_NEW":
                     after_hdb = True #If algo run after HDB the K could be variable and should not be part of the header (if multiple runs)
-                labels, curr_k, used_min_pts, used_eps = benchmark_single(points, runtype, curr_k, min_pts, eps)
+                labels, curr_k, used_min_pts, used_eps = benchmark_single(points, runtype, curr_k, min_pts, eps, mcs=mcs)
                 #Add the output labels to the collection of labels for this current dataset
                 curr_labels[r] = labels
                 header = ""
@@ -566,7 +577,7 @@ def metric_column(ground_truth, label_results, metric="ari"):
             #Currently should probably just be NMI: It is symmetric. 
     return comparison_column
 
-def benchmark_single(points, runtype, k, min_pts, eps):
+def benchmark_single(points, runtype, k, min_pts, eps, mcs):
     '''
     Runs the provided runtype on points and returns the k, min_pts and eps used in the algorithm and the resulting labels.
     '''
@@ -574,7 +585,7 @@ def benchmark_single(points, runtype, k, min_pts, eps):
     used_min_pts = 0
     used_eps = 0
     if runtype == "HDBSCAN":
-        hdbscan = HDBSCAN(min_cluster_size=2, min_samples = min_pts)
+        hdbscan = HDBSCAN(min_cluster_size=mcs, min_samples = min_pts)
         hdbscan.fit(points)
         labels = hdbscan.labels_
         k = len(np.unique(labels))
@@ -582,7 +593,7 @@ def benchmark_single(points, runtype, k, min_pts, eps):
             k -= 1
         used_min_pts = min_pts
     elif runtype == "HDBSCAN_NEW":
-        hdbscan_new = HDBSCANNary(min_pts = min_pts, min_cluster_size=2)
+        hdbscan_new = HDBSCANNary(min_pts = min_pts, min_cluster_size=mcs)
         hdbscan_new.fit(points)
         labels = hdbscan_new.labels_
         k = len(np.unique(labels))
@@ -635,8 +646,24 @@ def benchmark_single(points, runtype, k, min_pts, eps):
         labels = dckmeans.labels_
         used_min_pts = min_pts
 
+
+    elif runtype == "DCKMEANS_ELBOW":
+        k = len(points)
+        dckmeans = DCKCentroidsNary(k=k, min_pts=min_pts, loss="kmeans", noise_mode="none")
+        dckmeans.fit(points)
+        labels = dckmeans.labels_
+        used_min_pts = min_pts
+
+    elif runtype == "DCKMEDIAN_ELBOW":
+        k = len(points)
+        dckmedian = DCKCentroidsNary(k=k, min_pts=min_pts, loss="kmedian", noise_mode="none")
+        dckmedian.fit(points)
+        labels = dckmedian.labels_
+        used_min_pts = min_pts
+
+
     elif runtype == "HDBSCAN_o1":
-        hdbscan_new = HDBSCANNary(min_pts = min_pts, min_cluster_size=2)
+        hdbscan_new = HDBSCANNary(min_pts = min_pts, min_cluster_size=mcs)
         hdbscan_new.fit(points, objective="simple")
         labels = hdbscan_new.labels_
         k = len(np.unique(labels))
@@ -644,7 +671,7 @@ def benchmark_single(points, runtype, k, min_pts, eps):
             k -= 1
         used_min_pts = min_pts
     elif runtype == "HDBSCAN_o2":
-        hdbscan_new = HDBSCANNary(min_pts = min_pts, min_cluster_size=2)
+        hdbscan_new = HDBSCANNary(min_pts = min_pts, min_cluster_size=mcs)
         hdbscan_new.fit(points, objective="simple2")
         labels = hdbscan_new.labels_
         k = len(np.unique(labels))
@@ -656,11 +683,44 @@ def benchmark_single(points, runtype, k, min_pts, eps):
     return labels, k, used_min_pts, used_eps
 
 
+def find_elbow_point(costs):
+    # Convert to numpy array
+    costs = np.array(costs)
+    
+    # Calculate the difference between consecutive costs
+    diff = np.diff(costs)
+    
+    # Find the index of the maximum second difference (i.e., the maximum curvature)
+    second_diff = np.diff(diff)
+    elbow_index = np.argmax(second_diff) + 1  # +1 to adjust for the second difference index
+    
+    return elbow_index
+
+
 if __name__ == "__main__":
     #brute_force_comparision(num_points=10, min_pts=3)
     # points, labels = create_dataset(100, "coil")
     # print("points:", points[:100])
     # print("labels:", labels[:100])
-    benchmark(dataset_types=["moons", "blobs"], num_points=100, num_runs=3, runtypes=["HDBSCAN", "HDBSCAN_o1", "HDBSCAN_o2"], metrics=["ari"], k=3, min_pts=5, eps=2, save_results=False, visualize_results=True, plot_clusterings=False)
+    runtypes = ["HDBSCAN", "HDBSCAN_o1", "HDBSCAN_o2"]
+
+    synthbenchmark = []
+    benchmark2d = ["compound", "pathbased", "aggregate", "d31", "jain",  "spiral"]
+    synth2d = ["blobs", "blobs2", ]
+
+    benchmark10d = []
+    synth10d = []
+
+    #benchmark2d
+    benchmark(dataset_types=benchmark2d, num_points=1000, num_runs=1, runtypes=runtypes, metrics=["ari"], k=3, min_pts=5, mcs=5, eps=2, num_features=2, save_results=False, visualize_results=True, plot_clusterings=False)
+
+    #synth2d
+    benchmark(dataset_types=synth2d, num_points=1000, num_runs=3, runtypes=runtypes, metrics=["ari"], k=3, min_pts=5, mcs=5, eps=2, num_features=2, save_results=False, visualize_results=True, plot_clusterings=False)
+
+    #benchmark10d
+    benchmark(dataset_types=benchmark10d, num_points=100, num_runs=1, runtypes=runtypes, metrics=["ari"], k=3, min_pts=5, mcs=5, eps=2, num_features=10, save_results=False, visualize_results=True, plot_clusterings=False)
+
+    #synth10d
+    benchmark(dataset_types=synth10d, num_points=1000, num_runs=3, runtypes=runtypes, metrics=["ari"], k=3, min_pts=5, mcs=5, eps=2, num_features=10, save_results=False, visualize_results=True, plot_clusterings=False)
 
 

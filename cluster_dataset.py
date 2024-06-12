@@ -63,7 +63,7 @@ def runtime_save(points, labels, load_dataset):
 if __name__ == '__main__': 
     #################### RUN PARAMETERS HERE #######################
 
-    num_points = 200
+    num_points = 500
     k = 5
     min_pts = 5
     mcs = 5
@@ -72,7 +72,7 @@ if __name__ == '__main__':
     eps = 2
     dataset_type = "circle" 
     save_dataset = False
-    load_dataset = True #If true will override the other params and just load from the filename.
+    load_dataset = False #If true will override the other params and just load from the filename.
     save_name = "debugstability" #Shared for name of images, filename to save the dataset into
     load_name = "badex1"
 
@@ -193,7 +193,7 @@ if __name__ == '__main__':
 
 
 
-    dataset_type = "blobs" 
+    dataset_type = "gauss_quantiles" 
     points, labels = create_dataset(num_points=num_points, datatype=dataset_type, save=save_dataset, load=load_dataset, save_name=save_name, load_name=load_name, num_classes=k)
     ##points, labels = points[:142], labels[:142]
 

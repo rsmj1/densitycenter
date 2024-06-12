@@ -31,6 +31,7 @@ class DCKCentroids(object):
         self.center_indexes = None #The point indexes in the point list of the centers
         self.noise_mode = noise_mode #The execution mode - either no noise detection, "medium" noise detection or full noise detection
 
+        self.cost_decreases = []
         self.cdists = None
 
 
@@ -700,6 +701,7 @@ class DCKCentroids(object):
                 annotation[2].chosen = True #This is in-place modifying the tree
                 annotation[2].best_center = annotation[1] 
                 cluster_order_centers.append(annotation[1])
+                self.cost_decreases.append(annotation[0])
         return cluster_order_centers
 
 
