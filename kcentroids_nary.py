@@ -39,7 +39,8 @@ class DCKCentroids(object):
         '''
         Solves the K-median / K-means problem optimally over the dc-distance and (binary) dc-tree. 
         '''
-        print("Running " + self.loss + " with noise detection: " + self.noise_mode)
+        #print("Running " + self.loss + " with noise detection: " + self.noise_mode)
+        print("run with k:", self.k)
         self.cdists = self.get_cdists(points, self.min_pts)
         self.efficient_greedy(points)
         #self.simple_greedy(points)
@@ -528,8 +529,9 @@ class DCKCentroids(object):
         '''
         The annotations are built up as a list of [(cost-decrease, center, tree),...]
         '''
-        points, _ = self.prune_cluster_subtree(tree, self.min_pts) #This is one option... however this will not prune below splits, which might not be ideal. 
-        points = self.prune_cluster_subtree_aggressive(tree, self.min_pts)
+        #points, _ = self.prune_cluster_subtree(tree, self.min_pts) #This is one option... however this will not prune below splits, which might not be ideal. 
+        points, _ = self.prune_cluster_subtree_aggressive(tree, self.min_pts)
+        print("points:", points)
         point_set = set(points)
         #print("point_set:", point_set)
         pruned_annotations = []

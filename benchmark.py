@@ -15,6 +15,7 @@ from datetime import datetime
 import os, csv, glob
 
 from experiment_utils.get_data import get_dataset, make_circles
+from kneed import KneeLocator
 
 
 from distance_metric import get_dc_dist_matrix
@@ -24,15 +25,16 @@ from visualization import  plot_tree
 from cluster_tree import dc_clustering
 #from GDR import GradientDR
 from SpectralClustering import get_lambdas, get_sim_mx, run_spectral_clustering
+from sklearn_extra.cluster import KMedoids
 
 #My addons
 from kmeans import DCKMeans
-from sklearn.cluster import HDBSCAN
+from hdbscan import HDBSCAN as HDBSCAN
 from sklearn.cluster import KMeans
-from HDBSCAN import HDBSCAN as newScan
+from HDBSCAN_old import HDBSCAN as newScan
 from kmedian import DCKMedian
 from kcentroids import DCKCentroids
-
+from cluster_tree import dc_clustering
 from kcentroids_nary import DCKCentroids as DCKCentroidsNary
 from HDBSCANnary import HDBSCAN as HDBSCANNary
 
@@ -108,10 +110,12 @@ def create_dataset(num_points, datatype, save=False, load=False, save_name=None,
             points, labels = make_gaussian_quantiles(n_samples=num_points, n_features=num_features, n_classes=num_classes, cov=2.0)
         elif datatype == "classification":
             #n_informative is relative to n_features the amount of the features that actually help in the classification
-            points, labels = make_classification(n_samples=num_points, n_features=num_features, n_informative=num_features//2, n_classes=num_classes)
+            if num_features == 2:
+                num_classes = 2
+            points, labels = make_classification(n_samples=num_points, n_features=num_features, n_informative=num_features//2, n_redundant=0, n_classes=num_classes, n_clusters_per_class=1)
         elif datatype == "regression":
             #A regression problem, similar thought process to classification above.
-            points, labels = make_regression(n_samples=num_points, n_features=num_features, n_informative=num_features//2, n_classes=num_classes)
+            points, labels = make_regression(n_samples=num_points, n_features=num_features, n_informative=num_features//2, n_redundant=0, n_classes=num_classes)
 
         # More than 2 features: Not for plotting. Synthetic 
         elif datatype == "swiss_rolls":
@@ -151,6 +155,9 @@ def create_dataset(num_points, datatype, save=False, load=False, save_name=None,
         elif datatype == "spiral":
             points, labels = load_txt_datasets("spiral")
 
+        elif datatype == "testing":
+            points = np.array([[1,2], [1,4],[2,3],[1,1],[3.5,0.5],[7.5,-3],[40,40],[41,41],[40,41],[40.5,40.5],[30,30],[15,18],])
+            labels = np.array([3,1,2,0,4,5,6,7,11,9,10,8])
         ##### Toy datasets #####
         elif datatype == "synth":
             points, labels = get_dataset('synth', num_classes=num_classes, points_per_class=(num_points//num_classes))
@@ -308,7 +315,7 @@ def brute_force_comparision(num_points, min_pts, max_iters=100):
 
     return
 
-def benchmark(dataset_types, num_points, num_runs, runtypes, k, min_pts, eps, mcs=None, num_features=None, metrics=["nmi"],visualize_results=False, save_results=False, save_name="test", plot_clusterings = False, combine_results=False):
+def benchmark(dataset_types, num_points, num_runs, runtypes, k, min_pts, eps, mcs=None, num_features=None, metrics=["nmi"],visualize_results=False, save_results=False, save_name="test", plot_clusterings = False):
     '''
     Runs a set of algorithms "runtypes" on a set of datasets "dataset_types" with "num_runs" iterations on each dataset. 
     Within an iteration i of num_runs, will use the k (number of clusters) output from DBSCAN or HDBSCAN on algorithms that come after it.
@@ -384,9 +391,17 @@ def benchmark(dataset_types, num_points, num_runs, runtypes, k, min_pts, eps, mc
         comparison_matrix = np.zeros((num_runtypes+1, num_runtypes+1, num_runs, num_metrics)) #A num_runs layer 2d matrix for each metric
 
         comparison_column = np.zeros((1, num_runtypes, num_runs, num_metrics))
+
+
         for i in range(num_runs):
             curr_k = k #Reset k between each run
             points, ground_truths = create_dataset(num_points, dataset_type, num_features=num_features) #Move this outside num_runs if should be same across runs
+            if len(ground_truths) == len(points):
+                nclusters = len(np.unique(ground_truths))-1 if -1 in ground_truths else len(np.unique(ground_truths))
+            else:
+                nclusters = k
+
+            
             datasets.append(points) #Save the points generated for visualization later
             n = points.shape[0]
 
@@ -398,7 +413,7 @@ def benchmark(dataset_types, num_points, num_runs, runtypes, k, min_pts, eps, mc
             for r, runtype in enumerate(runtypes):
                 if runtype == "HDBSCAN" or runtype == "DBSCAN" or runtype == "HDBSCAN_NEW":
                     after_hdb = True #If algo run after HDB the K could be variable and should not be part of the header (if multiple runs)
-                labels, curr_k, used_min_pts, used_eps = benchmark_single(points, runtype, curr_k, min_pts, eps, mcs=mcs)
+                labels, curr_k, used_min_pts, used_eps = benchmark_single(points, runtype, curr_k, min_pts, eps, mcs=mcs, gtk = nclusters)
                 #Add the output labels to the collection of labels for this current dataset
                 curr_labels[r] = labels
                 header = ""
@@ -511,7 +526,7 @@ def display_results_2(results, runtypes, dataset_types, metrics):
     for m in range(num_metrics):
         ax = axes[m]
         curr_map = results[:,:,m]
-        im = ax.imshow(curr_map, cmap='viridis', interpolation=None)
+        im = ax.imshow(curr_map, cmap='Blues', interpolation=None,aspect="0.3", vmin=0, vmax=1)
         ax.set_title(metrics[m])
         print("shapes", results.shape[0], results.shape[1])
         ax.set_yticks(range(results.shape[0]))
@@ -565,6 +580,8 @@ def metric_matrix(label_results, metric="nmi"):
 def metric_column(ground_truth, label_results, metric="ari"):
     n = label_results.shape[0]
     comparison_column = np.zeros((1,n))
+    print("ground truth:", ground_truth)
+    print("label_results", label_results)
     for i, labels1 in enumerate(label_results):
         if metric == "nmi": #Normalized mutual information
             comparison_column[0,i] = nmi(ground_truth, labels1)
@@ -577,7 +594,7 @@ def metric_column(ground_truth, label_results, metric="ari"):
             #Currently should probably just be NMI: It is symmetric. 
     return comparison_column
 
-def benchmark_single(points, runtype, k, min_pts, eps, mcs):
+def benchmark_single(points, runtype, k, min_pts, eps, mcs, gtk):
     '''
     Runs the provided runtype on points and returns the k, min_pts and eps used in the algorithm and the resulting labels.
     '''
@@ -609,18 +626,28 @@ def benchmark_single(points, runtype, k, min_pts, eps, mcs):
             k -= 1
         used_min_pts = min_pts
         used_eps = eps
+
+    elif runtype == "KCENTER":
+        n = points.shape[0]
+        placeholder = np.zeros(n)
+        root, dc_dists = make_tree(points, placeholder, min_points=min_pts)
+        labels = dc_clustering(root, len(points), k=k, min_points=min_pts, with_noise=False)
+    
     elif runtype == "KMEANS": #SKLEARN Kmeans
-        kmeans = KMeans(n_clusters=k, n_init="auto")
+        kmeans = KMeans(n_clusters=gtk, n_init="auto")
         kmeans.fit(points)
         labels = kmeans.labels_
+    elif runtype == "KMEDOIDS":
+        kmedoids = KMedoids(n_clusters=gtk, random_state=0).fit(points)
+        labels = kmedoids.labels_
 
     elif runtype == "DCKMEANS":
         dckmeans = DCKCentroidsNary(k=k, min_pts=min_pts, loss="kmeans", noise_mode="none")
         dckmeans.fit(points)
         labels = dckmeans.labels_
         used_min_pts = min_pts
-    elif runtype == "DCKMEANS_MED":
-        dckmeans = DCKCentroidsNary(k=k, min_pts=min_pts, loss="kmeans", noise_mode="medium")
+    elif runtype == "DCKMEANS_MED": #NOTE GTK
+        dckmeans = DCKCentroidsNary(k=gtk, min_pts=min_pts, loss="kmeans", noise_mode="medium")
         dckmeans.fit(points)
         labels = dckmeans.labels_
         used_min_pts = min_pts
@@ -635,8 +662,8 @@ def benchmark_single(points, runtype, k, min_pts, eps, mcs):
         dckmedian.fit(points)
         labels = dckmedian.labels_
         used_min_pts = min_pts
-    elif runtype == "DCKMEDIAN_MED":
-        dckmeans = DCKCentroidsNary(k=k, min_pts=min_pts, loss="kmedian", noise_mode="medium")
+    elif runtype == "DCKMEDIAN_MED": #NOTE GTK
+        dckmeans = DCKCentroidsNary(k=gtk, min_pts=min_pts, loss="kmedian", noise_mode="medium")
         dckmeans.fit(points)
         labels = dckmeans.labels_
         used_min_pts = min_pts
@@ -648,19 +675,60 @@ def benchmark_single(points, runtype, k, min_pts, eps, mcs):
 
 
     elif runtype == "DCKMEANS_ELBOW":
-        k = len(points)
-        dckmeans = DCKCentroidsNary(k=k, min_pts=min_pts, loss="kmeans", noise_mode="none")
+        nk = len(points)
+        dckmeans = DCKCentroidsNary(k=nk, min_pts=min_pts, loss="kmeans", noise_mode="none")
         dckmeans.fit(points)
-        labels = dckmeans.labels_
+        costs = dckmeans.cost_decreases
+        costs = costs[1:] #Remove the first np.inf
+        k_values = list(range(2, len(costs) + 2))  # Assuming k starts at 2 and increments by 1
+        print("costs:", costs)
+        kn = KneeLocator(k_values, costs, curve='convex', direction='decreasing')
+        print("chosen k:", kn.knee)
+        elbow_k = kn.knee
+        dckmeans_elbow = DCKCentroidsNary(k=elbow_k, min_pts=min_pts, loss="kmeans", noise_mode="none")
+        dckmeans_elbow.fit(points)
+        labels = dckmeans_elbow.labels_
         used_min_pts = min_pts
 
     elif runtype == "DCKMEDIAN_ELBOW":
-        k = len(points)
-        dckmedian = DCKCentroidsNary(k=k, min_pts=min_pts, loss="kmedian", noise_mode="none")
+        nk = len(points)
+        dckmedian = DCKCentroidsNary(k=nk, min_pts=min_pts, loss="kmedian", noise_mode="none")
+        dckmedian.fit(points)
+        costs = dckmedian.cost_decreases
+        costs = costs[1:] #Remove the first np.inf
+        k_values = list(range(2, len(costs) + 2))  # Assuming k starts at 2 and increments by 1
+        kn = KneeLocator(k_values, costs, curve='convex', direction='decreasing')
+        elbow_k = kn.knee
+        print("elbow k:", elbow_k)
+        dckmedian_elbow = DCKCentroidsNary(k=elbow_k, min_pts=min_pts, loss="kmedian", noise_mode="none")
+        dckmedian_elbow.fit(points)
+        labels = dckmedian_elbow.labels_
+        used_min_pts = min_pts
+
+    elif runtype == "DCKMEANS_GTK":
+        dckmeans = DCKCentroidsNary(k=gtk, min_pts=min_pts, loss="kmeans", noise_mode="none")
+        dckmeans.fit(points)
+        labels = dckmeans.labels_
+        used_min_pts = min_pts
+    
+    elif runtype == "DCKMEDIAN_GTK":
+        dckmedian = DCKCentroidsNary(k=gtk, min_pts=min_pts, loss="kmedian", noise_mode="none")
         dckmedian.fit(points)
         labels = dckmedian.labels_
         used_min_pts = min_pts
 
+
+    elif runtype == "DCKMEANS_GTK10":
+        dckmeans = DCKCentroidsNary(k=gtk, min_pts=10, loss="kmeans", noise_mode="none")
+        dckmeans.fit(points)
+        labels = dckmeans.labels_
+        used_min_pts = min_pts
+    
+    elif runtype == "DCKMEDIAN_GTK10":
+        dckmedian = DCKCentroidsNary(k=gtk, min_pts=10, loss="kmedian", noise_mode="none")
+        dckmedian.fit(points)
+        labels = dckmedian.labels_
+        used_min_pts = min_pts
 
     elif runtype == "HDBSCAN_o1":
         hdbscan_new = HDBSCANNary(min_pts = min_pts, min_cluster_size=mcs)
@@ -683,18 +751,6 @@ def benchmark_single(points, runtype, k, min_pts, eps, mcs):
     return labels, k, used_min_pts, used_eps
 
 
-def find_elbow_point(costs):
-    # Convert to numpy array
-    costs = np.array(costs)
-    
-    # Calculate the difference between consecutive costs
-    diff = np.diff(costs)
-    
-    # Find the index of the maximum second difference (i.e., the maximum curvature)
-    second_diff = np.diff(diff)
-    elbow_index = np.argmax(second_diff) + 1  # +1 to adjust for the second difference index
-    
-    return elbow_index
 
 
 if __name__ == "__main__":
@@ -702,17 +758,21 @@ if __name__ == "__main__":
     # points, labels = create_dataset(100, "coil")
     # print("points:", points[:100])
     # print("labels:", labels[:100])
-    runtypes = ["HDBSCAN", "HDBSCAN_o1", "HDBSCAN_o2"]
+    runtypes = ["DCKMEANS_ELBOW", "DCKMEANS_GTK", "DCKMEDIAN_ELBOW", "DCKMEDIAN_GTK", "DCKMEANS_MED","KCENTER","HDBSCAN"]
+    runtypes2 = ["KMEANS", "KMEDOIDS", "DCKMEDIAN_GTK", "DCKMEANS_GTK","DCKMEDIAN_GTK10", "DCKMEANS_GTK10"]
 
-    synthbenchmark = []
-    benchmark2d = ["compound", "pathbased", "aggregate", "d31", "jain",  "spiral"]
-    synth2d = ["blobs", "blobs2", ]
 
-    benchmark10d = []
-    synth10d = []
+    benchmark2d = ["testing","compound", "pathbased", "aggregate", "d31", "jain",  "spiral"]
+    synth2d = ["blobs", "blobs2", "quantiles", "moons", "TODO" ]
 
-    #benchmark2d
-    benchmark(dataset_types=benchmark2d, num_points=1000, num_runs=1, runtypes=runtypes, metrics=["ari"], k=3, min_pts=5, mcs=5, eps=2, num_features=2, save_results=False, visualize_results=True, plot_clusterings=False)
+    benchmark10d = ["coil", ]
+    synth10d = ["blobs", "blobs2","quantiles", "swiss_rolls", "s_curve", "friedman"]
+
+    #benchmark(dataset_types=["blobs", "blobs", "blobs", "blobs", "blobs"], num_points=20, num_runs=1, runtypes=["DCKMEDIAN_ELBOW", "DCKMEDIAN", "DCKMEDIAN", "DCKMEDIAN_GTK", "KMEANS", "KMEDOIDS"], metrics=["ari"], k=5, min_pts=5, mcs=5, eps=2, num_features=2, save_results=False, visualize_results=True, plot_clusterings=False)
+
+
+    #benchmark2d - remember to set to use optimal k
+    benchmark(dataset_types=benchmark2d, num_points=1000, num_runs=1, runtypes=runtypes, metrics=["ari"], k=5, min_pts=3, mcs=5, eps=2, num_features=2, save_results=False, visualize_results=True, plot_clusterings=False)
 
     #synth2d
     benchmark(dataset_types=synth2d, num_points=1000, num_runs=3, runtypes=runtypes, metrics=["ari"], k=3, min_pts=5, mcs=5, eps=2, num_features=2, save_results=False, visualize_results=True, plot_clusterings=False)

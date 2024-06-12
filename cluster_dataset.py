@@ -26,13 +26,11 @@ from cluster_tree import copy_tree, prune_tree
 #Algorithms
 from sklearn.cluster import SpectralClustering
 from SpectralClustering import get_lambdas, get_sim_mx, run_spectral_clustering
-from sklearn.cluster import HDBSCAN
+from hdbscan import HDBSCAN as HDBSCAN
 from sklearn.cluster import KMeans
-
 from kmeans import DCKMeans
 from kmedian import DCKMedian
 from DBSCAN import DBSCAN
-from HDBSCAN import HDBSCAN as newScan
 from kcentroids import DCKCentroids
 from HDBSCANnary import HDBSCAN as HDBSCANnary
 from kcentroids_nary import DCKCentroids as DCKCentroids_nary
@@ -63,16 +61,16 @@ def runtime_save(points, labels, load_dataset):
 if __name__ == '__main__': 
     #################### RUN PARAMETERS HERE #######################
 
-    num_points = 500
+    num_points = 200
     k = 5
-    min_pts = 5
-    mcs = 5
+    min_pts = 3
+    mcs = 2
 
     plot_tree_bool = False  
     eps = 2
     dataset_type = "circle" 
     save_dataset = False
-    load_dataset = False #If true will override the other params and just load from the filename.
+    load_dataset = True #If true will override the other params and just load from the filename.
     save_name = "debugstability" #Shared for name of images, filename to save the dataset into
     load_name = "badex1"
 
@@ -193,10 +191,10 @@ if __name__ == '__main__':
 
 
 
-    dataset_type = "gauss_quantiles" 
+    dataset_type = "compound" 
     points, labels = create_dataset(num_points=num_points, datatype=dataset_type, save=save_dataset, load=load_dataset, save_name=save_name, load_name=load_name, num_classes=k)
     ##points, labels = points[:142], labels[:142]
-
+    #print("badex labels:", labels)
 
     #visualize(points=points, cluster_labels=labels, minPts=min_pts, distance="mut_reach", centers=None, save=save_visualization, save_name=image_save_name)
     
@@ -230,18 +228,35 @@ if __name__ == '__main__':
     #plot_tree(new_hierarchy, is_binary=False)
     #new_hierarchy = kmedian_nary.define_cluster_hierarchy_binary(points)
     #plot_tree(new_hierarchy, is_binary=True)
+
+
+    k = len(np.unique(labels)) if -1 not in labels else len(np.unique(labels))-1
     #K-means clustering
-    kmeans = DCKCentroids(k=k, min_pts=min_pts, loss="kmeans", noise_mode="medium")
+    kmeans = DCKCentroids_nary(k=k, min_pts=min_pts, loss="kmeans", noise_mode="none")
     kmeans.fit(points)
 
     kmeans_labels = kmeans.labels_
     centers = kmeans.centers
-    
+
+    kmeans_sklearn = KMeans(n_clusters=k, n_init="auto")
+    kmeans_sklearn.fit(points)
+    kmeans_sklearn_labels = kmeans_sklearn.labels_
 
 
+    kmeans_noise = DCKCentroids_nary(k=k, min_pts=min_pts, loss="kmeans", noise_mode="medium")
+    kmeans_noise.fit(points)
+
+    kmeans_noise_labels = kmeans_noise.labels_
+    centers = kmeans.centers
+
+
+    kcenter_labels = dc_clustering(root, len(points), k=k, min_points=min_pts, with_noise=False)[0]
+    print("KCENTER_LABELS:", kcenter_labels)
     hdbscan_nary = HDBSCANnary(min_pts=min_pts, min_cluster_size=mcs, allow_single_cluster=False)
     hdbscan_nary.fit(points)
     hdbscan_nary_labels = hdbscan_nary.labels_
+
+
 
     num_clusters_new = len(np.unique(hdbscan_nary_labels))
     if np.isin(-1, hdbscan_nary_labels) and num_clusters_new != 1: #Should not count noise labels as a set of labels
@@ -287,8 +302,8 @@ if __name__ == '__main__':
     nclusters = len(np.unique(hdbscan_nary_labels))-1 if -1 in hdbscan_nary_labels else len(np.unique(hdbscan_nary_labels))
     plot_embedding(
         plot_points,
-        [hdbscan_nary_labels],
-        ['Dataset with ' + str(len(hdbscan_nary_labels)) + ' points and ' + str(nclusters) + " clusters"],
+        [kmeans_noise_labels],
+        ['Dataset with ' + str(len(hdbscan_nary_labels)) + ' points and ' + str(k) + " clusters"],
         centers=centers,
         dot_scale=2, #6 used for small dataset, 2 used for 400 points
         annotations=False
