@@ -169,7 +169,12 @@ def create_dataset(num_points, datatype, save=False, load=False, save_name=None,
         ##### Benchmark datasets #####
         elif datatype == "coil": 
             #The coil100 dataset
-            points, labels = get_dataset('coil', class_list=np.arange(1, num_classes), points_per_class=(num_points//num_classes))
+            points, labels = get_dataset('coil', class_list=np.arange(1, num_classes), points_per_class=(num_points//num_classes), desired_dim=num_features)
+            print("coil points:", points.shape)
+        elif datatype == "coil20": 
+            #The coil100 dataset
+            points, labels = get_dataset('coil', class_list=np.arange(1, num_classes), points_per_class=(num_points//num_classes), desired_dim=20)
+            print("coil points:", points.shape)
         else:
             raise AssertionError("Dataset type \"" + datatype + "\" does not exist. Stopping...")
         
@@ -396,6 +401,7 @@ def benchmark(dataset_types, num_points, num_runs, runtypes, k, min_pts, eps, mc
         for i in range(num_runs):
             curr_k = k #Reset k between each run
             points, ground_truths = create_dataset(num_points, dataset_type, num_features=num_features) #Move this outside num_runs if should be same across runs
+            #print("dataset:", dataset_type, "ground_truths:", ground_truths)
             if len(ground_truths) == len(points):
                 nclusters = len(np.unique(ground_truths))-1 if -1 in ground_truths else len(np.unique(ground_truths))
             else:
@@ -631,7 +637,7 @@ def benchmark_single(points, runtype, k, min_pts, eps, mcs, gtk):
         n = points.shape[0]
         placeholder = np.zeros(n)
         root, dc_dists = make_tree(points, placeholder, min_points=min_pts)
-        labels = dc_clustering(root, len(points), k=k, min_points=min_pts, with_noise=False)[0]
+        labels = dc_clustering(root, len(points), k=gtk, min_points=min_pts, with_noise=False)[0]
     
     elif runtype == "KMEANS": #SKLEARN Kmeans
         kmeans = KMeans(n_clusters=gtk, n_init="auto")
@@ -646,7 +652,7 @@ def benchmark_single(points, runtype, k, min_pts, eps, mcs, gtk):
         dckmeans.fit(points)
         labels = dckmeans.labels_
         used_min_pts = min_pts
-    elif runtype == "DCKMEANS_MED": #NOTE GTK
+    elif runtype == "DCKMEANS_NOISE": #NOTE GTK
         dckmeans = DCKCentroidsNary(k=gtk, min_pts=min_pts, loss="kmeans", noise_mode="medium")
         dckmeans.fit(points)
         labels = dckmeans.labels_
@@ -662,7 +668,7 @@ def benchmark_single(points, runtype, k, min_pts, eps, mcs, gtk):
         dckmedian.fit(points)
         labels = dckmedian.labels_
         used_min_pts = min_pts
-    elif runtype == "DCKMEDIAN_MED": #NOTE GTK
+    elif runtype == "DCKMEDIAN_NOISE": #NOTE GTK
         dckmeans = DCKCentroidsNary(k=gtk, min_pts=min_pts, loss="kmedian", noise_mode="medium")
         dckmeans.fit(points)
         labels = dckmeans.labels_
@@ -705,26 +711,26 @@ def benchmark_single(points, runtype, k, min_pts, eps, mcs, gtk):
         labels = dckmedian_elbow.labels_
         used_min_pts = min_pts
 
-    elif runtype == "DCKMEANS_GTK":
+    elif runtype == "DCKMEANS_K_OPT":
         dckmeans = DCKCentroidsNary(k=gtk, min_pts=min_pts, loss="kmeans", noise_mode="none")
         dckmeans.fit(points)
         labels = dckmeans.labels_
         used_min_pts = min_pts
     
-    elif runtype == "DCKMEDIAN_GTK":
+    elif runtype == "DCKMEDIAN_K_OPT":
         dckmedian = DCKCentroidsNary(k=gtk, min_pts=min_pts, loss="kmedian", noise_mode="none")
         dckmedian.fit(points)
         labels = dckmedian.labels_
         used_min_pts = min_pts
 
 
-    elif runtype == "DCKMEANS_GTK10":
+    elif runtype == "DCKMEANS_K_OPT10":
         dckmeans = DCKCentroidsNary(k=gtk, min_pts=10, loss="kmeans", noise_mode="none")
         dckmeans.fit(points)
         labels = dckmeans.labels_
         used_min_pts = min_pts
     
-    elif runtype == "DCKMEDIAN_GTK10":
+    elif runtype == "DCKMEDIAN_K_OPT10":
         dckmedian = DCKCentroidsNary(k=gtk, min_pts=10, loss="kmedian", noise_mode="none")
         dckmedian.fit(points)
         labels = dckmedian.labels_
@@ -758,27 +764,26 @@ if __name__ == "__main__":
     # points, labels = create_dataset(100, "coil")
     # print("points:", points[:100])
     # print("labels:", labels[:100])
-    runtypes = ["DCKMEANS_ELBOW", "DCKMEANS_GTK", "DCKMEDIAN_ELBOW", "DCKMEDIAN_GTK", "DCKMEANS_MED","KCENTER","HDBSCAN"]
-    runtypes2 = ["KMEANS", "KMEDOIDS", "DCKMEDIAN_GTK", "DCKMEANS_GTK","DCKMEDIAN_GTK10", "DCKMEANS_GTK10"]
+    runtypes = ["DCKMEANS_ELBOW", "DCKMEANS_K_OPT", "DCKMEDIAN_ELBOW", "DCKMEDIAN_K_OPT", "DCKMEANS_NOISE","KCENTER","HDBSCAN"]
+    runtypes2 = ["KMEANS", "KMEDOIDS", "DCKMEDIAN_K_OPT", "DCKMEANS_K_OPT","DCKMEDIAN_K_OPT10", "DCKMEANS_K_OPT10", "DCKMEANS_NOISE"]
 
 
     benchmark2d = ["compound", "pathbased", "aggregate", "d31", "jain",  "spiral"]
-    synth2d = ["blobs", "blobs2", "quantiles", "moons", "TODO" ]
-
-    benchmark10d = ["coil", ]
-    synth10d = ["blobs", "blobs2","quantiles", "swiss_rolls", "s_curve", "friedman"]
+    synth2d = ["blobs", "blobs2", "gauss_quantiles", "moons", "circle" ]
+ 
+    synth10d = ["coil", "coil20","blobs", "blobs2","gauss_quantiles"]
 
     #benchmark(dataset_types=["blobs", "blobs", "blobs", "blobs", "blobs"], num_points=20, num_runs=1, runtypes=["DCKMEDIAN_ELBOW", "DCKMEDIAN", "DCKMEDIAN", "DCKMEDIAN_GTK", "KMEANS", "KMEDOIDS"], metrics=["ari"], k=5, min_pts=5, mcs=5, eps=2, num_features=2, save_results=False, visualize_results=True, plot_clusterings=False)
 
 
     #benchmark2d - remember to set to use optimal k
-    benchmark(dataset_types=benchmark2d, num_points=1000, num_runs=1, runtypes=runtypes, metrics=["ari"], k=5, min_pts=5, mcs=5, eps=2, num_features=2, save_results=False, visualize_results=True, plot_clusterings=False)
+    #benchmark(dataset_types=benchmark2d, num_points=1000, num_runs=1, runtypes=runtypes, metrics=["ari"], k=5, min_pts=3, mcs=3, eps=2, num_features=2, save_results=False, visualize_results=True, plot_clusterings=False)
 
     #synth2d
-    benchmark(dataset_types=synth2d, num_points=1000, num_runs=3, runtypes=runtypes, metrics=["ari"], k=3, min_pts=5, mcs=5, eps=2, num_features=2, save_results=False, visualize_results=True, plot_clusterings=False)
+    #benchmark(dataset_types=synth2d, num_points=1000, num_runs=1, runtypes=runtypes, metrics=["ari"], k=3, min_pts=3, mcs=3, eps=2, num_features=2, save_results=False, visualize_results=True, plot_clusterings=False)
 
     #benchmark10d
-    benchmark(dataset_types=benchmark10d, num_points=100, num_runs=1, runtypes=runtypes, metrics=["ari"], k=3, min_pts=5, mcs=5, eps=2, num_features=10, save_results=False, visualize_results=True, plot_clusterings=False)
+    #benchmark(dataset_types=benchmark10d, num_points=1000, num_runs=1, runtypes=runtypes, metrics=["ari"], k=3, min_pts=5, mcs=5, eps=2, num_features=10, save_results=False, visualize_results=True, plot_clusterings=False)
 
     #synth10d
     benchmark(dataset_types=synth10d, num_points=1000, num_runs=3, runtypes=runtypes, metrics=["ari"], k=3, min_pts=5, mcs=5, eps=2, num_features=10, save_results=False, visualize_results=True, plot_clusterings=False)

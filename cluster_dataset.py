@@ -61,7 +61,7 @@ def runtime_save(points, labels, load_dataset):
 if __name__ == '__main__': 
     #################### RUN PARAMETERS HERE #######################
 
-    num_points = 200
+    num_points = 12
     k = 5
     min_pts = 3
     mcs = 2
@@ -70,9 +70,9 @@ if __name__ == '__main__':
     eps = 2
     dataset_type = "circle" 
     save_dataset = False
-    load_dataset = True #If true will override the other params and just load from the filename.
+    load_dataset = False #If true will override the other params and just load from the filename.
     save_name = "debugstability" #Shared for name of images, filename to save the dataset into
-    load_name = "badex1"
+    load_name = "blobs12"
 
     #visualization parameters - comment in or out the visualization tools in the section below
     save_visualization = False
@@ -219,13 +219,20 @@ if __name__ == '__main__':
 
 
 
-    kmedian_nary = DCKCentroids_nary(k=k, min_pts=min_pts, loss="kmedian", noise_mode="none")
+    kmedian_nary = DCKCentroids_nary(k=k, min_pts=min_pts, loss="kmeans", noise_mode="none")
     kmedian_nary.fit(points)
 
     kmedian_labels_nary = kmedian_nary.labels_
     kmedian_centers_nary = kmedian_nary.center_indexes
-    #new_hierarchy = kmedian_nary.define_cluster_hierarchy_nary(points)
-    #plot_tree(new_hierarchy, is_binary=False)
+    new_hierarchy = kmedian_nary.define_cluster_hierarchy_nary(points)
+    
+    #labels = ["lightgreen" for i in range(len(points))]
+    
+    plot_embedding(points, [labels], [dataset_type], dot_scale=2, annotations=False)
+    plot_tree_v2(n_root,labels=labels, node_size=1000)
+    plot_tree_v2(new_hierarchy, labels=labels, node_size=1000)
+    runtime_save(points, labels, load_dataset) #Enable this to have the option to save a dataset during runtime via the command line.
+
     #new_hierarchy = kmedian_nary.define_cluster_hierarchy_binary(points)
     #plot_tree(new_hierarchy, is_binary=True)
 
@@ -238,20 +245,19 @@ if __name__ == '__main__':
     kmeans_labels = kmeans.labels_
     centers = kmeans.centers
 
-    kmeans_sklearn = KMeans(n_clusters=k, n_init="auto")
-    kmeans_sklearn.fit(points)
-    kmeans_sklearn_labels = kmeans_sklearn.labels_
+    # kmeans_sklearn = KMeans(n_clusters=k, n_init="auto")
+    # kmeans_sklearn.fit(points)
+    # kmeans_sklearn_labels = kmeans_sklearn.labels_
 
 
-    kmeans_noise = DCKCentroids_nary(k=k, min_pts=min_pts, loss="kmeans", noise_mode="medium")
-    kmeans_noise.fit(points)
+    # kmeans_noise = DCKCentroids_nary(k=k, min_pts=min_pts, loss="kmeans", noise_mode="medium")
+    # kmeans_noise.fit(points)
 
-    kmeans_noise_labels = kmeans_noise.labels_
-    centers = kmeans.centers
+    # kmeans_noise_labels = kmeans_noise.labels_
+    # centers = kmeans.centers
 
 
-    kcenter_labels = dc_clustering(root, len(points), k=k, min_points=min_pts, with_noise=False)[0]
-    print("KCENTER_LABELS:", kcenter_labels)
+    #kcenter_labels = dc_clustering(root, len(points), k=k, min_points=min_pts, with_noise=False)[0]
     hdbscan_nary = HDBSCANnary(min_pts=min_pts, min_cluster_size=mcs, allow_single_cluster=False)
     hdbscan_nary.fit(points)
     hdbscan_nary_labels = hdbscan_nary.labels_
@@ -302,7 +308,7 @@ if __name__ == '__main__':
     nclusters = len(np.unique(hdbscan_nary_labels))-1 if -1 in hdbscan_nary_labels else len(np.unique(hdbscan_nary_labels))
     plot_embedding(
         plot_points,
-        [kmeans_noise_labels],
+        [kmeans_labels],
         ['Dataset with ' + str(len(hdbscan_nary_labels)) + ' points and ' + str(k) + " clusters"],
         centers=centers,
         dot_scale=2, #6 used for small dataset, 2 used for 400 points

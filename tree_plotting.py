@@ -60,7 +60,7 @@ def plot_embedding(embed_points, embed_labels, titles, centers = None, main_titl
             axes[i].scatter(noise_points[:, 0], noise_points[:, 1], c=noise_labels, s=dot_size, edgecolor=noise_edgecolors, zorder=2)
 
 
-        axes[i].set_title(titles[i])
+        axes[i].set_title(titles[i], fontsize=20)
         if "K-means" in titles[i] and centers is not None and co == 0:
             axes[i].scatter(centers[:, 0], centers[:,1], c="none", s=dot_size, edgecolor="r")
             co += 1
