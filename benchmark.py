@@ -24,16 +24,12 @@ from tree_plotting import plot_embedding
 from visualization import  plot_tree
 from cluster_tree import dc_clustering
 #from GDR import GradientDR
-from SpectralClustering import get_lambdas, get_sim_mx, run_spectral_clustering
 from sklearn_extra.cluster import KMedoids
 
 #My addons
 from kmeans import DCKMeans
 from hdbscan import HDBSCAN as HDBSCAN
 from sklearn.cluster import KMeans
-from HDBSCAN_old import HDBSCAN as newScan
-from kmedian import DCKMedian
-from kcentroids import DCKCentroids
 from cluster_tree import dc_clustering
 from kcentroids_nary import DCKCentroids as DCKCentroidsNary
 from HDBSCANnary import HDBSCAN as HDBSCANNary
@@ -545,7 +541,6 @@ def display_results_2(results, runtypes, dataset_types, metrics):
             ax.text(i,j,np.round(label, 2),ha='center',va='center', fontsize='small')
 
 
-
     plt.tight_layout()
     plt.show()
     return
@@ -668,7 +663,7 @@ def benchmark_single(points, runtype, k, min_pts, eps, mcs, gtk):
         dckmedian.fit(points)
         labels = dckmedian.labels_
         used_min_pts = min_pts
-    elif runtype == "DCKMEDIAN_NOISE": #NOTE GTK
+    elif runtype == "DCKMEDIAN_NOISE": #NOTE GTK = ground truth k
         dckmeans = DCKCentroidsNary(k=gtk, min_pts=min_pts, loss="kmedian", noise_mode="medium")
         dckmeans.fit(points)
         labels = dckmeans.labels_

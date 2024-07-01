@@ -30,7 +30,7 @@ def visualize_embedding(dists, names, distance, labels = None):
 
   plt.show()
 
-def visualize(points, cluster_labels = None, num_neighbors=None, embed = False, distance="dc_dist", minPts=3, centers=None, save=False, save_name=None):
+def visualize(points, cluster_labels = None, embed = False, distance="dc_dist", minPts=3, centers=None, save=False, save_name=None):
   '''
   Visualizes the complete graph G over the points with chosen distances on the edges.
 
@@ -41,9 +41,6 @@ def visualize(points, cluster_labels = None, num_neighbors=None, embed = False, 
 
     cluster_labels: Numpy.Array, default=None 
       This shows a distinct color for each ground truth cluster a point is a part of, should be a 1D array with a label for each point. If None, will make all points blue.
-
-    num_neighbors: Int, default=None
-      Will be used to make graph less complete - only num_neighbors closest points will have edges. If none the graph will be complete
     
     embed : Boolean, default=False
       If true, will show the distances in embedded space with MDS.
@@ -104,7 +101,7 @@ def visualize(points, cluster_labels = None, num_neighbors=None, embed = False, 
   ax.set_axisbelow(True)
   n = points.shape[0]
   G = nx.Graph()
-  edges, edge_labels = create_edges(dists, num_neighbors)
+  edges, edge_labels = create_edges(dists)
   G.add_edges_from(edges)
 
   labels = {node: str(node) for node in G.nodes()}
@@ -281,7 +278,7 @@ def get_cdists(points, min_pts):
 
 
 #Currently creates edges for a complete graph
-def create_edges(distance_matrix, num_neighbors = None):
+def create_edges(distance_matrix):
   #print("dist matrix:", distance_matrix)
   edges = []
   edge_labels = {}
@@ -443,6 +440,8 @@ def make_node_lists(root, point_labels, parent_count, dist_list, edge_list, colo
 
 def plot_tree(root, labels=None, centers=None, save=False, save_name=None, is_binary=True, extra_annotations=None):
     '''
+    ***THIS METHOD IS KEPT AS LEGACY AS IT STILL IS ABLE TO PLOT THE BINARY DC-TREE***
+
     Plots the dc-dist tree, optionally highligthing nodes chosen as centers with a red outline. Shows the node indexes on the leaves and dc-distances in the non-leaf nodes. The leaves are color-coded by the provided labels.
     A yellow outline means that a node was labelled noise. 
     Parameters
@@ -570,13 +569,14 @@ def plot_tree_v2(root, labels=None, centers=None, save=False, save_name=None, ex
     A yellow outline means that a node was labelled noise. 
     Parameters
     ----------
-    root : DensityTree
+    root : NaryDensityTree
     labels : Numpy.Array
     centers : Numpy.Array, default=None
     save : Boolean, default=False
     save_name : String, default=None
-    extra_annotations, Numpy.Array, default=None
+    extra_annotations : Numpy.Array, default=None
       The annotations should be provided in preorder traversal order over the binary tree.
+    node_size : int, default=900
     '''
 
     if labels is None:

@@ -103,6 +103,8 @@ class HDBSCAN(object):
         2. Compute the dendrogram structure, which is equivalent to the dc_tree structure and contains the same information when combined with the core distances
         3. Compute the clustering over the dc_tree. 
         4. Label the clustering.
+
+        "objective" parameter is used if other objectives than the stability should be used. Currently pretty hardcoded, but easily extended on.
         '''
         n = points.shape[0]
         if n < self.min_pts or n < self.min_cluster_size:
