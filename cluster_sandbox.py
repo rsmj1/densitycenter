@@ -5,7 +5,7 @@ from datetime import datetime
 import time
 
 from density_tree import make_tree
-from n_density_tree import make_n_tree
+from density_tree_nary import make_n_tree
 
 from tree_plotting import plot_embedding
 from cluster_tree import dc_clustering
@@ -18,7 +18,7 @@ from sklearn.cluster import KMeans
 from sklearn_extra.cluster import KMedoids
 from DBSCAN import DBSCAN
 from kcentroids import DCKCentroids
-from HDBSCANnary import HDBSCAN as HDBSCANnary
+from HDBSCAN_nary import HDBSCAN as HDBSCANnary
 from kcentroids_nary import DCKCentroids as DCKCentroids_nary
 from kneed import KneeLocator
 
@@ -186,7 +186,6 @@ if __name__ == '__main__':
     # eu_kmeans = KMeans(n_clusters=k, n_init="auto")
     # eu_kmeans.fit(points)
     # eu_labels = kmeans.labels_
-
 
 
     ################################### RESULTS VISUALIZATION #####################################

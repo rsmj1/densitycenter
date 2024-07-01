@@ -18,24 +18,21 @@ from experiment_utils.get_data import get_dataset, make_circles
 from kneed import KneeLocator
 
 
-from distance_metric import get_dc_dist_matrix
 from density_tree import make_tree
-from tree_plotting import plot_embedding
-from visualization import  plot_tree
+from visualization import  plot_tree, plot_embedding
 from cluster_tree import dc_clustering
 #from GDR import GradientDR
 from sklearn_extra.cluster import KMedoids
 
 #My addons
-from kmeans import DCKMeans
 from hdbscan import HDBSCAN as HDBSCAN
 from sklearn.cluster import KMeans
 from cluster_tree import dc_clustering
 from kcentroids_nary import DCKCentroids as DCKCentroidsNary
-from HDBSCANnary import HDBSCAN as HDBSCANNary
+from HDBSCAN_nary import HDBSCAN as HDBSCANNary
 
 
-from point_gen import create_hierarchical_clusters
+from synthetic_point_gen import create_hierarchical_clusters
 from visualization import visualize, print_numpy_code
 from itertools import chain, combinations
 import efficientdcdist.dctree as dcdist

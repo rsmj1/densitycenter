@@ -1,6 +1,6 @@
 import numpy as np
 from density_tree import DensityTree
-from n_density_tree import NaryDensityTree
+from density_tree_nary import NaryDensityTree
 
 class Cluster:
     def __init__(self, center, points, peak):

@@ -2,7 +2,7 @@ import efficientdcdist.dctree as dcdist
 import numpy as np
 import heapq
 import numba
-from n_density_tree import make_n_tree, prune_n_tree, get_leaves, NaryDensityTree
+from density_tree_nary import make_n_tree, prune_n_tree, get_leaves, NaryDensityTree
 from density_tree import DensityTree
 
 class DCKCentroids(object):

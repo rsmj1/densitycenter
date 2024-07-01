@@ -1,7 +1,7 @@
 import efficientdcdist.dctree as dcdist
 import numpy as np
 import numba
-from n_density_tree import make_n_tree, get_leaves
+from density_tree_nary import make_n_tree, get_leaves
 '''
 Thoughts about HDBSCAN:
 
@@ -16,23 +16,23 @@ Implementation observations:
 
 '''
 
-
 class HDBSCAN(object):
     '''
     This is an O(n^2) implementation of HDBSCAN* as propopsed by Campello, Moulavi and Sander. 
+    However, it is implemented over the dc-tree instead of explicitly creating the dendrogram.
 
     The steps:
-    1. Compute the Core Distances of all the points
-    2. Compute the DCTree
-    3. Bottom up recursion on the DCTree, computing the stability in each node.
+    1. Compute the core Distances of all the points
+    2. Compute the dc-tree
+    3. Bottom up recursion on the dc-tree, computing the stability in each node.
 
+    Optionally, the stability objective can be switched to another objective function. 
 
 
     '''
 
     def __init__(self, *, min_pts, min_cluster_size=1, allow_single_cluster=False, tree=None):
         '''
-        
         Parameters
         ----------
 
@@ -41,10 +41,13 @@ class HDBSCAN(object):
 
         min_cluster_size : Int, default = 1
             Determines the minimal number of points that need to be density connected at a given epsilon to not be considered noise.
-            If 1 points are considered noise if they are non-core objects. If 2 we consider a point noise even if it is still a core point, 
+            If 1, points are considered noise if they are non-core objects. If 2 we consider a point noise even if it is still a core point, 
             but gets disconnected from the other points in the MST (but still has a self-edge essentially). From 3 and up, any connected components at a given level with fever than that amount of points are considered noise.
             With 1 there are no noise points output, as all noise points techically at the split point are a cluster with stability 0 (or more if a core-point for longer).
             Points will still be considered noise with respect to a cluster at some epsilon level, however. 
+        
+        allow_single_cluster : Boolean, default=False
+            If true, this allows the algorithm to output all points as a cluster
         '''
         self.min_pts = min_pts
         self.min_cluster_size = min_cluster_size
@@ -147,21 +150,20 @@ class HDBSCAN(object):
             This indicates whether we have a cluster split from above / a merge from below, meaning that stability computations should be made to evaluate the cluster at this level if True.
         '''
         if self.min_cluster_size > dc_tree.size:
-            #Temp code for stability annotations:
-            stab = self.cluster_stability(dc_tree, dc_tree.parent.dist, dc_tree.size, cdists)
-            self.extra_annotations.append(dc_tree.size)
+            #Extra annotation should happen here if wanted:
+            #stab = self.cluster_stability(dc_tree, dc_tree.parent.dist, dc_tree.size, cdists)
+            #self.extra_annotations.append(stab)
 
-
-            #print("leaf, returning noise", self.get_leaves(dc_tree)+1)
             return [], 0 #Noise
         else:
-            #Temp code for stability annotations:
-            if dc_tree.parent is not None:
-                stab = self.cluster_stability(dc_tree, dc_tree.parent.dist, dc_tree.size, cdists)
-                self.extra_annotations.append(dc_tree.size)
-            else:
-                stab = np.infty
-                self.extra_annotations.append(dc_tree.size)
+            #Extra annotation should happen here if wanted:
+            # if dc_tree.parent is not None:
+            #     stab = self.cluster_stability(dc_tree, dc_tree.parent.dist, dc_tree.size, cdists)
+            #     self.extra_annotations.append(dc_tree.size)
+            # else:
+            #     stab = np.infty
+            #     self.extra_annotations.append(dc_tree.size)
+
 
             #Real code from here and below
             total_stability = 0
@@ -177,7 +179,7 @@ class HDBSCAN(object):
                 total_stability += stability
                 below_clusters += clusters
 
-
+            #Merge above is only here for efficency, it would work without it.
             if merge_above: #When we have a merge above, we know that this current subtree in its entirety might constitute a cluster depending on stability computations within it.                
                 if dc_tree.parent is None: #Root call
                     #print("Root call check!")
@@ -282,8 +284,69 @@ class HDBSCAN(object):
 
 
 
-            ###############################################
-            ############ NEW STABILITY STUFF ##############
+
+    ###############################################
+    ############ NEW STABILITY STUFF ##############
+    ###############################################
+
+
+    def compute_clustering_general(self, dc_tree, cdists, stability_function):
+        '''
+        Main HDBSCAN computation algorithm over the n-ary dc-tree.
+
+        Parameters
+        ----------
+
+        dc_tree : NaryDensityTree
+            The dc-tree over the set of points the HDBSCAN algorithm is run on.
+        cdists : np.array
+            An array of the core-distances between all of the points. 
+        merge_above : Boolean, default=True
+            This indicates whether we have a cluster split from above / a merge from below, meaning that stability computations should be made to evaluate the cluster at this level if True.
+        '''
+        if self.min_cluster_size > dc_tree.size:
+            #Temp code for stability annotations:
+            stab = self.cluster_stability_experimental(dc_tree, cdists)
+            self.extra_annotations.append(stab)
+
+
+            #print("leaf, returning noise", self.get_leaves(dc_tree)+1)
+            return [], 0 #Noise
+        else:
+            #Temp code for stability annotations:
+            stab = self.cluster_stability_experimental(dc_tree, cdists)
+            self.extra_annotations.append(stab)
+
+            #Real code from here and below
+            total_stability = 0
+            below_clusters = []
+            split_size = self.split_size(dc_tree, self.min_cluster_size)
+            
+            for child in dc_tree.children:
+                if child.size >= self.min_cluster_size and split_size >= 2: #Currently we do not allow multiple points at the same height (as leaves) to constitute a split.
+                    clusters, stability = self.compute_clustering_general(child, cdists, stability_function)
+                else:
+                    clusters, stability = self.compute_clustering_general(child, cdists, stability_function)
+
+                total_stability += stability
+                below_clusters += clusters
+
+            if dc_tree.parent is None: #Root call
+                return below_clusters
+                
+            else: #We compute the stability only here - all our stability measurements work bottom up - so even for the "new" stability measurement, we can just continue working up from the previous "checkpoint".
+                new_stability = stability_function(dc_tree, cdists)
+                # print("cdists:", dc_tree.dist)
+                # print("new_stability:", new_stability)
+                # print("total_stability:", total_stability)
+                if new_stability >= total_stability:
+                    if new_stability == 0:#This means that it is a leaf with same cdist as the distance above
+                        return [], 0
+                    
+                    return [dc_tree], new_stability
+                else:
+                    return below_clusters, total_stability
+
 
 
     def cluster_stability_experimental(self, tree, cdists):
@@ -389,60 +452,4 @@ class HDBSCAN(object):
     
     
 
-
-    def compute_clustering_general(self, dc_tree, cdists, stability_function):
-        '''
-        Main HDBSCAN computation algorithm over the n-ary dc-tree.
-
-        Parameters
-        ----------
-
-        dc_tree : NaryDensityTree
-            The dc-tree over the set of points the HDBSCAN algorithm is run on.
-        cdists : np.array
-            An array of the core-distances between all of the points. 
-        merge_above : Boolean, default=True
-            This indicates whether we have a cluster split from above / a merge from below, meaning that stability computations should be made to evaluate the cluster at this level if True.
-        '''
-        if self.min_cluster_size > dc_tree.size:
-            #Temp code for stability annotations:
-            stab = self.cluster_stability_experimental(dc_tree, cdists)
-            self.extra_annotations.append(stab)
-
-
-            #print("leaf, returning noise", self.get_leaves(dc_tree)+1)
-            return [], 0 #Noise
-        else:
-            #Temp code for stability annotations:
-            stab = self.cluster_stability_experimental(dc_tree, cdists)
-            self.extra_annotations.append(stab)
-
-            #Real code from here and below
-            total_stability = 0
-            below_clusters = []
-            split_size = self.split_size(dc_tree, self.min_cluster_size)
-            
-            for child in dc_tree.children:
-                if child.size >= self.min_cluster_size and split_size >= 2: #Currently we do not allow multiple points at the same height (as leaves) to constitute a split.
-                    clusters, stability = self.compute_clustering_general(child, cdists, stability_function)
-                else:
-                    clusters, stability = self.compute_clustering_general(child, cdists, stability_function)
-
-                total_stability += stability
-                below_clusters += clusters
-
-            if dc_tree.parent is None: #Root call
-                return below_clusters
-                
-            else: #We compute the stability only here - all our stability measurements work bottom up - so even for the "new" stability measurement, we can just continue working up from the previous "checkpoint".
-                new_stability = stability_function(dc_tree, cdists)
-                # print("cdists:", dc_tree.dist)
-                # print("new_stability:", new_stability)
-                # print("total_stability:", total_stability)
-                if new_stability >= total_stability:
-                    if new_stability == 0:#This means that it is a leaf with same cdist as the distance above
-                        return [], 0
-                    
-                    return [dc_tree], new_stability
-                else:
-                    return below_clusters, total_stability
+    
