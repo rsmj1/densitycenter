@@ -4,9 +4,10 @@ import requests
 from mnist import MNIST #This will load mnist from the folder it is stored in
 from sklearn.datasets import fetch_openml
 import pickle
+import tarfile
 
 
-def load_mnist(type):
+def load_mnist(type="train"):
     '''
     type is whether to get training or eval set. "train" for training part.
     '''
@@ -51,6 +52,44 @@ def load_f_mnist(path, kind='train'):
 
     return images, labels
 
+
+def load_cifar_batch(file):
+    """Load a single batch of CIFAR-10."""
+    with open(file, 'rb') as fo:
+        dict = pickle.load(fo, encoding='bytes')
+    return dict
+
+def load_cifar_data(data_dir, num, type="train"):
+    '''
+    Load CIFAR dataset
+    They are pickled files as described on the website that stores the datasets - thus we load with pickle as seen here.
+    '''
+    batches = []
+    if num == 10:
+        data_dir = os.path.join(data_dir, 'CIFAR'+str(num), 'cifar-'+str(num)+'-batches-py')
+        if type == "train":
+            for i in range(1, 6): 
+                batch_file = os.path.join(data_dir, f'data_batch_{i}')
+                batch = load_cifar_batch(batch_file)
+                batches.append(batch)
+        else:
+            batches.append(load_cifar_batch(os.path.join(data_dir, "test_batch")))
+        
+        data = np.concatenate([batch[b'data'] for batch in batches])
+        labels = np.concatenate([batch[b'labels'] for batch in batches])
+    else:
+        data_dir = os.path.join(data_dir, 'CIFAR'+str(num), 'cifar-'+str(num)+'-python')
+        if type == "train":
+            batches.append(load_cifar_batch(os.path.join(data_dir, "train")))
+        else:
+            batches.append(load_cifar_batch(os.path.join(data_dir, "test")))
+        data = np.concatenate([batch[b'data'] for batch in batches])
+        labels = np.concatenate([batch[b'fine_labels'] for batch in batches])
+    
+
+    return data, labels
+
+
 def fetch_datasets():
     #Needs to check whether folder structure is present first
     base_directory = 'datasets'
@@ -59,7 +98,10 @@ def fetch_datasets():
     '''
     Datasets to be fetched and their URLs:
     1. KDDCUP04BIO : https://cs.joensuu.fi/sipu/datasets/KDDCUP04Bio.txt
-    2. MNIST
+    2. MNIST : https://www.openml.org/search?type=data&status=active&id=554
+    3. FASHION MNIST : https://github.com/zalandoresearch/fashion-mnist?tab=readme-ov-file#loading-data-with-other-machine-learning-libraries
+    4. CIFAR 10
+    5. CIFAR 100
     '''
 
 
@@ -114,9 +156,43 @@ def fetch_datasets():
         print("skipping #3")
 
 
+    #https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz
+    #4 CIFAR 10
+    CIFAR10 = os.path.join(base_directory, 'CIFAR10')
+    if not os.path.exists(CIFAR10):
+        os.makedirs(CIFAR10, exist_ok=True)
+        fileurl = 'https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz'
+        with open(os.path.join(CIFAR10, 'cifar-10-python.tar.gz'), 'wb') as file:
+            content = requests.get(fileurl, stream=True).content
+            file.write(content)
 
+            tar = tarfile.open(os.path.join(CIFAR10, 'cifar-10-python.tar.gz'), 'r:gz')
+            tar.extractall(path=CIFAR10)
+            tar.close()
+        print("Downloaded 4")
+    else:
+        print("skipping #4")
 
+    #5 CIFAR 100
+    CIFAR100 = os.path.join(base_directory, 'CIFAR100')
+    if not os.path.exists(CIFAR100):
+        os.makedirs(CIFAR100, exist_ok=True)
+        fileurl = 'https://www.cs.toronto.edu/~kriz/cifar-100-python.tar.gz'
+        with open(os.path.join(CIFAR100, 'cifar-100-python.tar.gz'), 'wb') as file:
+            content = requests.get(fileurl, stream=True).content
+            file.write(content)
+
+            tar = tarfile.open(os.path.join(CIFAR100, 'cifar-100-python.tar.gz'), 'r:gz')
+            tar.extractall(path=CIFAR100)
+            tar.close()
+        print("Downloaded 5")
+        
+    else:
+        print("skipping #5")
+
+        
     return
+
 
 
 fetch_datasets()
