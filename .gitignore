@@ -34,3 +34,4 @@ umap/Images
 build/
 .DS_Store
 *.so
+datasets/
