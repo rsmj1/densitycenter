@@ -5,7 +5,7 @@ from mnist import MNIST #This will load mnist from the folder it is stored in
 from sklearn.datasets import fetch_openml
 import pickle
 import tarfile
-
+import ucimlrepo
 
 def load_mnist(type="train"):
     '''
@@ -30,9 +30,7 @@ def load_mnist(type="train"):
         return eval_x, eval_y
 
 def load_f_mnist(path, kind='train'):
-    import os
     import gzip
-    import numpy as np
     #Taken from the fashion mnist github. https://github.com/zalandoresearch/fashion-mnist?tab=readme-ov-file#loading-data-with-other-machine-learning-libraries
     """Load MNIST data from `path`"""
     labels_path = os.path.join(path,
@@ -89,10 +87,22 @@ def load_cifar_data(data_dir, num, type="train"):
 
     return data, labels
 
+def load_covertype(path):
 
-def fetch_datasets():
+    with open(os.path.join(path, 'data.pkl'), 'rb') as file:
+        data = pickle.load(file)
+
+    with open(os.path.join(path, 'labels.pkl'), 'rb') as file:
+        labels = pickle.load(file)
+
+    data = data.to_numpy()
+    labels = labels.to_numpy()
+    return data, labels
+
+def fetch_datasets(dataset_folder_name='datasets'):
     #Needs to check whether folder structure is present first
-    base_directory = 'datasets'
+    base_directory = dataset_folder_name
+
     os.makedirs(base_directory, exist_ok=True)
     
     '''
@@ -100,8 +110,10 @@ def fetch_datasets():
     1. KDDCUP04BIO : https://cs.joensuu.fi/sipu/datasets/KDDCUP04Bio.txt
     2. MNIST : https://www.openml.org/search?type=data&status=active&id=554
     3. FASHION MNIST : https://github.com/zalandoresearch/fashion-mnist?tab=readme-ov-file#loading-data-with-other-machine-learning-libraries
-    4. CIFAR 10
-    5. CIFAR 100
+    4. CIFAR 10 : https://www.cs.toronto.edu/~kriz/cifar.html
+    5. CIFAR 100 : https://www.cs.toronto.edu/~kriz/cifar.html
+    6. Covertype : https://archive.ics.uci.edu/dataset/31/covertype
+
     '''
 
 
@@ -190,7 +202,25 @@ def fetch_datasets():
     else:
         print("skipping #5")
 
+
+    #Covertype
+    Covertype = os.path.join(base_directory, 'covertype')
+    if not os.path.exists(Covertype):
+        os.makedirs(Covertype, exist_ok=True)
         
+        covertype = ucimlrepo.fetch_ucirepo(id=31) 
+        x = covertype.data.features
+        y = covertype.data.targets
+        with open(os.path.join(Covertype, 'data.pkl'), 'wb') as file:
+            pickle.dump(x, file)
+        with open(os.path.join(Covertype, 'labels.pkl'), 'wb') as file:
+            pickle.dump(y, file)
+
+        print("Downloaded 6")
+    else:
+        print("skipping #6")
+
+
     return
 
 
