@@ -111,7 +111,7 @@ if __name__ == '__main__':
     
     #Real datasets
     num_points = 12
-    dataset_type = "compound" 
+    dataset_type = "blobs" 
     
     save_dataset = False
     save_name = "debugstability" #Name that the dataset and accompanying images are saved with
@@ -130,7 +130,7 @@ if __name__ == '__main__':
 
     #################### INITIALIZE TREE ####################
     #These two methods create the binary and n-ary dc-tree. The dc-dist-matrix is the same for both.
-    root, dc_dist_matrix = make_tree(points, None, min_points=min_pts)
+    root, dc_dist_matrix = make_tree(points, labels=ground_truth_labels, min_points=min_pts)
     n_root, dc_dist_matrix = make_n_tree(points, None, min_points=min_pts)
 
 
@@ -160,10 +160,15 @@ if __name__ == '__main__':
     kmedian_hierarchy = kmedian.define_cluster_hierarchy_nary(points)
 
     #Elbow method on K-median
-    costs = kmedian.cost_decreases
+    nk = len(points)
+    dckmeans = DCKCentroids_nary(k=nk, min_pts=min_pts, loss="kmedian", noise_mode="none")
+    dckmeans.fit(points)
+    costs = dckmeans.cost_decreases
     costs = costs[1:] #Remove the first np.inf
     k_values = list(range(2, len(costs) + 2))  # Assuming k starts at 2 and increments by 1
-    k_elbow = KneeLocator(k_values, costs, curve='convex', direction='decreasing')
+    kn = KneeLocator(k_values, costs, curve='convex', direction='decreasing')
+    k_elbow = kn.knee
+    print("k_elbow:", k_elbow)
     kmedian_elbow = DCKCentroids_nary(k=k_elbow, min_pts=min_pts, loss="kmedian", noise_mode="none")
     kmedian_elbow.fit(points)
     elbow_labels = kmedian_elbow.labels_
@@ -175,7 +180,7 @@ if __name__ == '__main__':
     kmeans_centers = kmeans.center_indexes
     kmeans_hierarchy = kmeans.define_cluster_hierarchy_nary(points)
 
-    
+    plot_tree_v2(kmeans_hierarchy)
     # #Euclidean K-median
     # kmedoids = KMedoids(n_clusters=k, random_state=0).fit(points)
     # labels = kmedoids.labels_

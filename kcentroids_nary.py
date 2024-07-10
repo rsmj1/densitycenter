@@ -40,7 +40,7 @@ class DCKCentroids(object):
         Solves the K-median / K-means problem optimally over the dc-distance and (binary) dc-tree. 
         '''
         #print("Running " + self.loss + " with noise detection: " + self.noise_mode)
-        print("run with k:", self.k)
+        print("kcentroid run with k:", self.k)
         self.cdists = self.get_cdists(points, self.min_pts)
         self.efficient_greedy(points)
         #self.simple_greedy(points)
