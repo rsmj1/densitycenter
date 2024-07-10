@@ -106,6 +106,27 @@ def fetch_datasets(dataset_folder_name='datasets'):
     os.makedirs(base_directory, exist_ok=True)
     
     '''
+    The big dataset thing already made:
+    https://clustpy.readthedocs.io/en/latest/clustpy.data.html
+
+
+
+    Categorical
+    [Adult](https://archive.ics.uci.edu/dataset/2/adult)
+    Biological
+    [KDDCUP04BIO](https://cs.joensuu.fi/sipu/datasets/)
+    [Elegans](https://data.caltech.edu/records/j4ycn-dpv05)*
+    [Molecular typography](https://data.caltech.edu/records/qaqhb-r9m40)*
+    Geographic
+    [Taxi dataset](https://figshare.com/articles/dataset/Porto_taxi_trajectories/12302165) (just the start locations)
+    Classics
+    [Covertype](https://archive.ics.uci.edu/dataset/31/covertype)
+    Point Cloud
+    nuScenes scene; tutorial [here](https://www.nuscenes.org/nuscenes?tutorial=lidarseg_panoptic) shows how to get a small version of it.
+
+
+
+
     Datasets to be fetched and their URLs:
     1. KDDCUP04BIO : https://cs.joensuu.fi/sipu/datasets/KDDCUP04Bio.txt
     2. MNIST : https://www.openml.org/search?type=data&status=active&id=554
@@ -203,7 +224,7 @@ def fetch_datasets(dataset_folder_name='datasets'):
         print("skipping #5")
 
 
-    #Covertype
+    #6 Covertype
     Covertype = os.path.join(base_directory, 'covertype')
     if not os.path.exists(Covertype):
         os.makedirs(Covertype, exist_ok=True)
@@ -219,7 +240,6 @@ def fetch_datasets(dataset_folder_name='datasets'):
         print("Downloaded 6")
     else:
         print("skipping #6")
-
 
     return
 

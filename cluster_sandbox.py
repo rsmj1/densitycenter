@@ -7,9 +7,8 @@ import time
 from density_tree import make_tree
 from density_tree_nary import make_n_tree
 
-from tree_plotting import plot_embedding
 from cluster_tree import dc_clustering
-from visualization import visualize, plot_tree, plot_tree_v2
+from visualization import visualize, plot_tree, plot_tree_v2, plot_embedding
 from benchmark import create_dataset
 
 #Algorithms
@@ -17,7 +16,6 @@ from hdbscan import HDBSCAN as HDBSCAN
 from sklearn.cluster import KMeans
 from sklearn_extra.cluster import KMedoids
 from DBSCAN import DBSCAN
-from kcentroids import DCKCentroids
 from HDBSCAN_nary import HDBSCAN as HDBSCANnary
 from kcentroids_nary import DCKCentroids as DCKCentroids_nary
 from kneed import KneeLocator
