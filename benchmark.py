@@ -462,6 +462,7 @@ def benchmark(dataset_types, num_points, num_runs, runtypes, k, min_pts, eps, mc
         display_results(benchmark_results, headers, rundata, dataset_types, metrics) #Should get as input the actual datasets to display the clusterings
     return
 
+#This method is not really useful at the moment
 def results_to_csv(results, headers, rundata, file_name):
     with open("savefiles/benchmarks/"+file_name+".csv", "w", newline='') as res_file:
         writer = csv.writer(res_file, delimiter=";")

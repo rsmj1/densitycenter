@@ -751,7 +751,7 @@ class DCKCentroids(object):
         center_list = self.center_order_list(annotations, n) #We need the full hierarchy, so choose k=n for amount of centers.
         cost = dc_tree.cost
         self.cdists = self.get_cdists(points, self.min_pts)
-        print("center_list:", center_list)
+        #print("center_list:", center_list)
         return self.construct_centroid_hierarchy_helper_nary(dc_tree, center_list, cost)
     
     
@@ -762,28 +762,25 @@ class DCKCentroids(object):
         Centers is a list of the form [(center, cost_decrease),...]
         '''
         if len(centers) == 1:
-            leaf = NaryDensityTree(0, parent, size=1)
+            leaf = NaryDensityTree(0, parent=parent, size=1)
             leaf.point_id = centers[0][0]
             return leaf
         else:
-            root = NaryDensityTree(centers[0][0]+1 , parent, size=len(centers))
-            #root = NaryDensityTree(cost , parent, size=len(centers))
+            root = NaryDensityTree(centers[0][0]+1 , parent=parent, size=len(centers))
 
-            next_split_set = self.next_splitters(centers)
+            next_split_set = self.next_splitters(centers) #Finds all the next choices with equal cost-decrease (and as first element has the current cluster center)
             total_split_set = {}
-            total_cost_decrease = 0
             for splitter in next_split_set:
                 if centers[0][0] == splitter[0]:
                     continue
                 split_node, _ = self.find_lca_set(dc_tree, centers[0][0], splitter[0]) #The set of nodes this new center will be uniquely closest to - specifically the lca node containing them
                 new_split_set = set(get_leaves(split_node[1])) #The leaves of the split node
                 new_split_set_ordered = [center for center in centers if center[0] in new_split_set]
-                total_cost_decrease += splitter[1]
                 root.add_child(self.construct_centroid_hierarchy_helper_nary(split_node[1], new_split_set_ordered, splitter[1], root))
                 total_split_set.update(new_split_set_ordered)
             root.dist = next_split_set[1][1] #This makes it so the values in internal nodes represent the cost decreases.
             remaining_set_ordered = [center for center in centers if center[0] not in total_split_set] #We let remaining be left recursive set
-            if len(remaining_set_ordered) != 0:
+            if len(remaining_set_ordered) != 0: #If the new center choices to not take all the points away from previous clustering we keep recursing on that.
                 root.add_child(self.construct_centroid_hierarchy_helper_nary(dc_tree, remaining_set_ordered, cost, root))
             return root
 
